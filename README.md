@@ -133,7 +133,9 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 5. El escenario carga cinco estaciones livianas.
 6. Cada interacción se guarda inmediatamente o queda en la cola offline.
 7. Al pulsar “Comprendido”, el contenido se marca como completado.
-8. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
+8. El panel actualiza el contador, el porcentaje y el estado de cada contenido; la estación 3D recibe un marcador verde.
+9. Al volver a iniciar sesión, el avance se recupera desde el servidor y se reconstruye la misma vista.
+10. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
 
 ## 11. Criterios de aceptación
 
@@ -144,6 +146,8 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 - Un participante no puede modificar ni consultar datos de otro participante.
 - El escenario no solicita modelos locales inexistentes.
 - Los contenidos se enlazan por `interactionObjectId`, no por título.
+- El recorrido y el progreso contienen exactamente las cinco estaciones publicadas; los registros antiguos no vinculados quedan fuera.
+- El avance guardado muestra contenidos revisados, porcentaje y marcadores 3D después de iniciar una nueva sesión.
 - Los eventos fallidos por red se sincronizan al reconectar.
 - TypeScript revisa frontend y backend de forma independiente.
 - Lint, pruebas y build deben terminar sin errores.

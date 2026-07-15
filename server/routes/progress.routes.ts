@@ -2,9 +2,11 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import TrainingProgress, { type ITrainingProgress } from '../models/progress.model';
+import TrainingContent from '../models/content.model';
 import { authenticate, canAccessParticipant } from '../middleware/auth.middleware';
 import { validateInteractionInput, validateProgressItemInput } from '../domain/progress';
 import { readRequiredString } from '../utils/validation';
+import { getModuleInteractionObjectIds } from '../../shared/trainingModule';
 
 const router = Router();
 const MAX_STORED_INTERACTIONS = 1000;
@@ -61,7 +63,7 @@ router.get('/:participantId', async (req: Request, res: Response): Promise<void>
             return;
         }
 
-        res.json(progress);
+        res.json(progressSummary(progress));
     } catch (error: unknown) {
         console.error('Error obteniendo progreso:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
@@ -127,6 +129,22 @@ router.post('/content', async (req: Request, res: Response): Promise<void> => {
         const validation = validateProgressItemInput(req.body, 'contentId');
         if (!validation.ok) {
             res.status(400).json({ error: validation.error });
+            return;
+        }
+
+        if (!mongoose.isValidObjectId(validation.value.itemId)) {
+            res.status(400).json({ error: 'ID de contenido inválido.' });
+            return;
+        }
+        const interactionObjectIds = getModuleInteractionObjectIds(validation.value.moduleId);
+        const contentExists = await TrainingContent.exists({
+            _id: validation.value.itemId,
+            moduleId: validation.value.moduleId,
+            active: true,
+            ...(interactionObjectIds ? { interactionObjectId: { $in: interactionObjectIds } } : {}),
+        });
+        if (!contentExists) {
+            res.status(404).json({ error: 'El contenido no pertenece al recorrido activo.' });
             return;
         }
 
