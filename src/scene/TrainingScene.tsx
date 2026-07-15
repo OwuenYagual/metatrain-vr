@@ -4,7 +4,14 @@ import { OrbitControls, useGLTF } from '@react-three/drei';
 import { interactionSystem } from './interactionSystem';
 import { useTrainingStore } from '../store/useTrainingStore';
 import { PerformanceMonitor } from './performanceMonitor';
-import { TRAINING_STATIONS } from '../../shared/trainingModule';
+import {
+    getNextTrainingCheckpointId,
+    TRAINING_CHECKPOINTS,
+    TRAINING_STATIONS,
+} from '../../shared/trainingModule';
+import { progressService } from '../progress/progressService';
+import { APP_CONFIG } from '../config/appConfig';
+import { getErrorMessage } from '../api/apiClient';
 
 type StationVariant = 'manual' | 'folder' | 'board' | 'shield' | 'terminal';
 
@@ -15,10 +22,22 @@ type InteractiveProps = {
     variant: StationVariant;
 };
 
+type TrainingSceneProps = {
+    onCheckpointSaved: (message: string) => void;
+    onCheckpointError: (message: string) => void;
+};
+
+type CheckpointProps = {
+    checkpoint: (typeof TRAINING_CHECKPOINTS)[number];
+    index: number;
+    onSaved: (message: string) => void;
+    onError: (message: string) => void;
+};
+
 function OfficeRoom() {
     const { scene } = useGLTF('/models/room.glb');
     const room = useMemo(() => scene.clone(true), [scene]);
-    return <primitive object={room} position={[0, -1.5, 0]} scale={1} />;
+    return <primitive object={room} position={[0, -1.5, 0]} scale={2} />;
 }
 
 function ManualModel() {
@@ -113,6 +132,86 @@ function StationTrigger({ position, id, title, variant }: InteractiveProps) {
     );
 }
 
+function CheckpointTrigger({ checkpoint, index, onSaved, onError }: CheckpointProps) {
+    const [hovered, setHovered] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const { visitedCheckpointIds, setVisitedCheckpointIds } = useTrainingStore();
+    const visited = visitedCheckpointIds.includes(checkpoint.id);
+    const nextCheckpointId = getNextTrainingCheckpointId(visitedCheckpointIds);
+    const available = !visited && checkpoint.id === nextCheckpointId;
+    const locked = !visited && !available;
+    const markerColor = visited ? '#22c55e' : available ? '#2563eb' : '#64748b';
+
+    const handleClick = async (event: ThreeEvent<MouseEvent>) => {
+        event.stopPropagation();
+        if (saving) return;
+        if (visited) {
+            onSaved(`El checkpoint “${checkpoint.label}” ya está registrado.`);
+            return;
+        }
+        if (locked) {
+            const previousCheckpoint = TRAINING_CHECKPOINTS[index - 1];
+            onError(`Primero visita el checkpoint “${previousCheckpoint?.label ?? 'anterior'}”.`);
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const progress = await progressService.markCheckpointVisited(
+                APP_CONFIG.TRAINING_MODULE_ID,
+                checkpoint.id,
+            );
+            setVisitedCheckpointIds(progress.visitedCheckpoints);
+            onSaved(`Checkpoint “${checkpoint.label}” registrado correctamente.`);
+            void interactionSystem.registerInteraction(checkpoint.id, 'click').catch((error: unknown) => {
+                console.error('No se pudo registrar la interacción del checkpoint:', error);
+            });
+        } catch (error: unknown) {
+            onError(getErrorMessage(error, 'No se pudo guardar el checkpoint.'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <group
+            position={[...checkpoint.position] as [number, number, number]}
+            scale={hovered && !locked ? 1.12 : 1}
+            onClick={(event) => void handleClick(event)}
+            onPointerOver={(event) => {
+                event.stopPropagation();
+                setHovered(true);
+                document.body.style.cursor = 'pointer';
+            }}
+            onPointerOut={() => {
+                setHovered(false);
+                document.body.style.cursor = 'auto';
+            }}
+        >
+            <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.38, 0.58, 32]} />
+                <meshStandardMaterial
+                    color={markerColor}
+                    emissive={available || visited ? markerColor : '#000000'}
+                    emissiveIntensity={available || visited ? 0.55 : 0}
+                    transparent={locked}
+                    opacity={locked ? 0.45 : 1}
+                />
+            </mesh>
+            <mesh position={[0, 0.42, 0]}>
+                <cylinderGeometry args={[0.09, 0.18, 0.8, 8]} />
+                <meshStandardMaterial
+                    color={saving ? '#eab308' : markerColor}
+                    emissive={available || visited ? markerColor : '#000000'}
+                    emissiveIntensity={available || visited ? 0.45 : 0}
+                    transparent={locked}
+                    opacity={locked ? 0.45 : 1}
+                />
+            </mesh>
+        </group>
+    );
+}
+
 function supportsWebGL(): boolean {
     try {
         const canvas = document.createElement('canvas');
@@ -122,7 +221,7 @@ function supportsWebGL(): boolean {
     }
 }
 
-export default function TrainingScene() {
+export default function TrainingScene({ onCheckpointSaved, onCheckpointError }: TrainingSceneProps) {
     const [lowPerformanceMode, setLowPerformanceMode] = useState(false);
     const webGlAvailable = useMemo(() => supportsWebGL(), []);
 
@@ -153,6 +252,15 @@ export default function TrainingScene() {
                 <Suspense fallback={null}>
                     <OfficeRoom />
                     {TRAINING_STATIONS.map((station) => <StationTrigger key={station.id} {...station} />)}
+                    {TRAINING_CHECKPOINTS.map((checkpoint, index) => (
+                        <CheckpointTrigger
+                            key={checkpoint.id}
+                            checkpoint={checkpoint}
+                            index={index}
+                            onSaved={onCheckpointSaved}
+                            onError={onCheckpointError}
+                        />
+                    ))}
                 </Suspense>
             </Canvas>
         </>

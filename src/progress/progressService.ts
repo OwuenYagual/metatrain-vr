@@ -28,4 +28,17 @@ export const progressService = {
             throw error;
         }
     },
+
+    async markCheckpointVisited(moduleId: string, checkpointId: string): Promise<TrainingProgress> {
+        const response = await apiFetch('/progress/checkpoint', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ moduleId, checkpointId }),
+        });
+        const payload = await response.json() as { progress?: TrainingProgress };
+        if (!payload.progress || !Array.isArray(payload.progress.visitedCheckpoints)) {
+            throw new Error('El servidor devolvió un progreso de checkpoints inválido.');
+        }
+        return payload.progress;
+    },
 };

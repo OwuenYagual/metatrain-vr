@@ -4,13 +4,13 @@ export type ContentProgressSummary = {
     percentage: number;
 };
 
-export function calculateContentProgress(
-    availableContentIds: string[],
-    completedContentIds: string[],
+export function calculateProgress(
+    availableItemIds: readonly string[],
+    completedItemIds: readonly string[],
 ): ContentProgressSummary {
-    const availableIds = new Set(availableContentIds);
+    const availableIds = new Set(availableItemIds);
     const completedIds = new Set(
-        completedContentIds.filter((contentId) => availableIds.has(contentId)),
+        completedItemIds.filter((itemId) => availableIds.has(itemId)),
     );
     const totalCount = availableIds.size;
     const completedCount = completedIds.size;
@@ -21,3 +21,5 @@ export function calculateContentProgress(
         percentage: totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100),
     };
 }
+
+export const calculateContentProgress = calculateProgress;

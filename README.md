@@ -130,12 +130,13 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 2. El frontend consulta su progreso guardado.
 3. Si no hay progreso en curso, muestra los tres avatares 3D.
 4. El participante confirma un avatar y entra al módulo.
-5. El escenario carga cinco estaciones livianas.
-6. Cada interacción se guarda inmediatamente o queda en la cola offline.
-7. Al pulsar “Comprendido”, el contenido se marca como completado.
-8. El panel actualiza el contador, el porcentaje y el estado de cada contenido; la estación 3D recibe un marcador verde.
-9. Al volver a iniciar sesión, el avance se recupera desde el servidor y se reconstruye la misma vista.
-10. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
+5. El escenario carga cinco estaciones livianas y cuatro checkpoints ordenados.
+6. El participante visita los checkpoints con el puntero; solo el siguiente punto del recorrido está habilitado.
+7. Cada interacción se guarda inmediatamente o queda en la cola offline.
+8. Al pulsar “Comprendido”, el contenido se marca como completado.
+9. El panel actualiza los dos avances y la escena distingue checkpoints y contenidos completados.
+10. Al volver a iniciar sesión, el avance se recupera desde el servidor y se reconstruye la misma vista.
+11. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
 
 ## 11. Criterios de aceptación
 
@@ -147,6 +148,7 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 - El escenario no solicita modelos locales inexistentes.
 - Los contenidos se enlazan por `interactionObjectId`, no por título.
 - El recorrido y el progreso contienen exactamente las cinco estaciones publicadas; los registros antiguos no vinculados quedan fuera.
+- El recorrido contiene cuatro checkpoints únicos, se visitan en orden y el backend rechaza IDs ajenos al módulo.
 - El avance guardado muestra contenidos revisados, porcentaje y marcadores 3D después de iniciar una nueva sesión.
 - Los eventos fallidos por red se sincronizan al reconectar.
 - TypeScript revisa frontend y backend de forma independiente.

@@ -6,7 +6,11 @@ import TrainingContent from '../models/content.model';
 import { authenticate, canAccessParticipant } from '../middleware/auth.middleware';
 import { validateInteractionInput, validateProgressItemInput } from '../domain/progress';
 import { readRequiredString } from '../utils/validation';
-import { getModuleInteractionObjectIds } from '../../shared/trainingModule';
+import {
+    getModuleCheckpointIds,
+    getModuleInteractionObjectIds,
+    getNextTrainingCheckpointId,
+} from '../../shared/trainingModule';
 
 const router = Router();
 const MAX_STORED_INTERACTIONS = 1000;
@@ -108,8 +112,23 @@ router.post('/checkpoint', async (req: Request, res: Response): Promise<void> =>
             return;
         }
 
+        const checkpointIds = getModuleCheckpointIds(validation.value.moduleId);
+        if (checkpointIds && !checkpointIds.includes(validation.value.itemId)) {
+            res.status(400).json({ error: 'El checkpoint no pertenece al recorrido activo.' });
+            return;
+        }
+
         const progress = await getEditableProgress(req.auth!.id, validation.value.moduleId);
-        if (!progress.visitedCheckpoints.includes(validation.value.itemId)) {
+        const alreadyVisited = progress.visitedCheckpoints.includes(validation.value.itemId);
+        if (
+            checkpointIds
+            && !alreadyVisited
+            && getNextTrainingCheckpointId(progress.visitedCheckpoints) !== validation.value.itemId
+        ) {
+            res.status(409).json({ error: 'Debe visitar los checkpoints en el orden definido.' });
+            return;
+        }
+        if (!alreadyVisited) {
             progress.visitedCheckpoints.push(validation.value.itemId);
         }
         await progress.save();
