@@ -8,7 +8,12 @@ import { APP_CONFIG } from '../config/appConfig';
 import { authService } from '../auth/authService';
 import { getErrorMessage } from '../api/apiClient';
 import { progressService } from '../progress/progressService';
-import { calculateContentProgress } from '../progress/contentProgress';
+import { calculateContentProgress, calculateProgress } from '../progress/contentProgress';
+import {
+    getNextTrainingCheckpointId,
+    TRAINING_CHECKPOINT_IDS,
+    TRAINING_CHECKPOINTS,
+} from '../../shared/trainingModule';
 
 export default function TrainingPage() {
     const {
@@ -18,10 +23,16 @@ export default function TrainingPage() {
         setActiveContent,
         completedContentIds,
         setCompletedContentIds,
+        visitedCheckpointIds,
+        setVisitedCheckpointIds,
     } = useTrainingStore();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [savingContent, setSavingContent] = useState(false);
+    const [checkpointNotice, setCheckpointNotice] = useState('');
+    const [moduleStatus, setModuleStatus] = useState<'not_started' | 'in_progress' | 'approved' | 'failed'>('not_started');
+    const [moduleScore, setModuleScore] = useState<number | null>(null);
+    const [simulationCompleted, setSimulationCompleted] = useState(false);
     const navigate = useNavigate();
     const session = authService.getCurrentSession();
     const participantId = session?.participant.id;
@@ -34,8 +45,21 @@ export default function TrainingPage() {
         () => new Set(completedContentIds),
         [completedContentIds],
     );
+    const checkpointProgress = useMemo(() => calculateProgress(
+        TRAINING_CHECKPOINT_IDS,
+        visitedCheckpointIds,
+    ), [visitedCheckpointIds]);
+    const visitedCheckpointSet = useMemo(
+        () => new Set(visitedCheckpointIds),
+        [visitedCheckpointIds],
+    );
+    const nextCheckpointId = getNextTrainingCheckpointId(visitedCheckpointIds);
     const requiredContentsCompleted = contentProgress.totalCount >= APP_CONFIG.MIN_REQUIRED_CONTENTS
         && contentProgress.completedCount === contentProgress.totalCount;
+    const requiredCheckpointsCompleted = checkpointProgress.completedCount === APP_CONFIG.MIN_REQUIRED_CHECKPOINTS;
+    const guidedRouteCompleted = requiredContentsCompleted && requiredCheckpointsCompleted;
+    const moduleFinalized = moduleStatus === 'approved' || moduleStatus === 'failed';
+    const evaluationAvailable = simulationCompleted || moduleFinalized;
     const activeContentCompleted = activeContent
         ? completedContentSet.has(activeContent._id)
         : false;
@@ -49,6 +73,7 @@ export default function TrainingPage() {
         const controller = new AbortController();
         setContents([]);
         setCompletedContentIds([]);
+        setVisitedCheckpointIds([]);
         setActiveContent(null);
 
         Promise.all([
@@ -62,6 +87,10 @@ export default function TrainingPage() {
             .then(([loadedContents, savedProgress]) => {
                 setContents(loadedContents);
                 setCompletedContentIds(savedProgress?.completedContents ?? []);
+                setVisitedCheckpointIds(savedProgress?.visitedCheckpoints ?? []);
+                setModuleStatus(savedProgress?.status ?? 'not_started');
+                setModuleScore(savedProgress?.score ?? null);
+                setSimulationCompleted(savedProgress?.simulationCompleted ?? false);
             })
             .catch((requestError: unknown) => {
                 if (!controller.signal.aborted) {
@@ -79,6 +108,7 @@ export default function TrainingPage() {
         session?.participant.avatarId,
         setActiveContent,
         setCompletedContentIds,
+        setVisitedCheckpointIds,
         setContents,
     ]);
 
@@ -97,6 +127,9 @@ export default function TrainingPage() {
                 activeContent._id,
             );
             setCompletedContentIds(savedProgress.completedContents);
+            setModuleStatus(savedProgress.status);
+            setModuleScore(savedProgress.score);
+            setSimulationCompleted(savedProgress.simulationCompleted);
             setActiveContent(null);
         } catch (requestError: unknown) {
             setError(getErrorMessage(requestError, 'No se pudo guardar el contenido completado.'));
@@ -119,10 +152,41 @@ export default function TrainingPage() {
                 borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', textAlign: 'left', boxSizing: 'border-box',
             }}>
                 <h1 style={{ margin: 0, fontSize: '1.35rem' }}>Módulo 1: Inducción</h1>
-                <p>Interactúa con los cinco objetos usando el puntero.</p>
+                <p>Visita los cuatro checkpoints en orden e interactúa con los cinco objetos usando el puntero.</p>
                 {loading && <p>Cargando contenidos...</p>}
+                {!loading && (
+                    <section aria-labelledby="checkpoint-progress-title" aria-live="polite" style={{ marginTop: '0.85rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'baseline' }}>
+                            <h2 id="checkpoint-progress-title" style={{ margin: '0 0 0.4rem', fontSize: '1rem' }}>
+                                Checkpoints del recorrido
+                            </h2>
+                            <strong>{checkpointProgress.completedCount} de {checkpointProgress.totalCount}</strong>
+                        </div>
+                        <progress
+                            aria-label="Checkpoints visitados"
+                            value={checkpointProgress.completedCount}
+                            max={checkpointProgress.totalCount}
+                            style={{ width: '100%', height: '0.85rem', accentColor: '#2563eb' }}
+                        />
+                        <ol style={{ listStyle: 'none', padding: 0, margin: '0.35rem 0 0.9rem', display: 'grid', gap: '0.25rem' }}>
+                            {TRAINING_CHECKPOINTS.map((checkpoint) => {
+                                const visited = visitedCheckpointSet.has(checkpoint.id);
+                                const next = checkpoint.id === nextCheckpointId;
+                                const status = visited ? 'Visitado' : next ? 'Siguiente' : 'Bloqueado';
+                                const color = visited ? '#166534' : next ? '#1d4ed8' : '#64748b';
+                                return (
+                                    <li key={checkpoint.id} style={{ color }}>
+                                        <span aria-hidden="true">{visited ? '✓' : next ? '●' : '○'}</span>{' '}
+                                        {checkpoint.label}
+                                        <span style={{ fontSize: '0.85rem' }}> — {status}</span>
+                                    </li>
+                                );
+                            })}
+                        </ol>
+                    </section>
+                )}
                 {!loading && contentProgress.totalCount > 0 && (
-                    <section aria-labelledby="content-progress-title" aria-live="polite">
+                    <section aria-labelledby="content-progress-title" aria-live="polite" style={{ borderTop: '1px solid #cbd5e1', paddingTop: '0.75rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'baseline' }}>
                             <h2 id="content-progress-title" style={{ margin: '0 0 0.4rem', fontSize: '1rem' }}>
                                 Avance de contenidos
@@ -152,11 +216,40 @@ export default function TrainingPage() {
                         </ul>
                     </section>
                 )}
-                {requiredContentsCompleted && (
-                    <p role="status" style={{ padding: '0.75rem', margin: '0.9rem 0 0', background: '#dcfce7', color: '#166534', borderRadius: 6, fontWeight: 600 }}>
-                        Has revisado todos los contenidos. Tu avance está guardado.
+                {guidedRouteCompleted ? (
+                    <section style={{ padding: '0.75rem', margin: '0.9rem 0 0', background: evaluationAvailable ? '#dcfce7' : '#fff7ed', color: evaluationAvailable ? '#166534' : '#9a3412', borderRadius: 6 }}>
+                        <p role="status" style={{ fontWeight: 600 }}>
+                            {evaluationAvailable
+                                ? 'Recorrido y simulación completos: la evaluación final está habilitada.'
+                                : 'Recorrido completo: realiza la simulación de decisiones para continuar.'}
+                        </p>
+                        {moduleFinalized && moduleScore !== null && (
+                            <p style={{ marginTop: '0.4rem' }}>
+                                Último resultado: {moduleScore}% · {moduleStatus === 'approved' ? 'Aprobado' : 'No aprobado'}
+                            </p>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => navigate(evaluationAvailable ? '/evaluation' : '/simulation')}
+                            style={{ marginTop: '0.65rem', padding: '0.65rem 0.8rem', background: evaluationAvailable ? '#166534' : '#c2410c', color: '#fff', border: 0, borderRadius: 6, fontWeight: 700 }}
+                        >
+                            {moduleFinalized
+                                ? 'Ver resultado de la evaluación'
+                                : simulationCompleted
+                                    ? 'Iniciar evaluación final'
+                                    : 'Iniciar simulación'}
+                        </button>
+                    </section>
+                ) : requiredContentsCompleted ? (
+                    <p role="status" style={{ padding: '0.65rem', margin: '0.9rem 0 0', background: '#eff6ff', color: '#1d4ed8', borderRadius: 6 }}>
+                        Has revisado todos los contenidos. Completa los checkpoints pendientes.
                     </p>
-                )}
+                ) : requiredCheckpointsCompleted ? (
+                    <p role="status" style={{ padding: '0.65rem', margin: '0.9rem 0 0', background: '#eff6ff', color: '#1d4ed8', borderRadius: 6 }}>
+                        Has visitado todos los checkpoints. Revisa los contenidos pendientes.
+                    </p>
+                ) : null}
+                {checkpointNotice && <p role="status" style={{ marginTop: '0.65rem', color: '#166534' }}>{checkpointNotice}</p>}
                 {!loading && contents.length < APP_CONFIG.MIN_REQUIRED_CONTENTS && (
                     <p role="alert" style={{ color: '#92400e' }}>
                         El módulo requiere al menos {APP_CONFIG.MIN_REQUIRED_CONTENTS} contenidos; se encontraron {contents.length}.
@@ -190,7 +283,18 @@ export default function TrainingPage() {
             )}
 
             <div style={{ width: '100%', height: '100%' }}>
-                <SceneErrorBoundary><TrainingScene /></SceneErrorBoundary>
+                <SceneErrorBoundary>
+                    <TrainingScene
+                        onCheckpointSaved={(message) => {
+                            setError('');
+                            setCheckpointNotice(message);
+                        }}
+                        onCheckpointError={(message) => {
+                            setCheckpointNotice('');
+                            setError(message);
+                        }}
+                    />
+                </SceneErrorBoundary>
             </div>
         </main>
     );

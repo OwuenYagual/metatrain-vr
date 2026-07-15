@@ -43,6 +43,18 @@ test('EvaluationResult mantiene correctAnswers y status coherentes', async () =>
     await assert.rejects(evaluation.validate());
 });
 
+test('EvaluationResult calcula la puntuación a partir de las respuestas correctas', async () => {
+    const evaluation = new EvaluationResult({
+        participantId: '507f1f77bcf86cd799439011',
+        moduleId: 'induccion_001',
+        totalQuestions: 5,
+        correctAnswers: 4,
+        score: 70,
+        status: 'approved',
+    });
+    await assert.rejects(evaluation.validate());
+});
+
 test('un certificado no generado no recibe ID ni fecha de emisión', async () => {
     const certificate = new Certificate({
         participantId: '507f1f77bcf86cd799439011',
@@ -54,4 +66,15 @@ test('un certificado no generado no recibe ID ni fecha de emisión', async () =>
     await certificate.validate();
     assert.equal(certificate.certificateId, undefined);
     assert.equal(certificate.issuedAt, undefined);
+});
+
+test('un certificado generado exige una nota aprobatoria', async () => {
+    const certificate = new Certificate({
+        participantId: '507f1f77bcf86cd799439011',
+        moduleId: 'induccion_001',
+        score: 60,
+        status: 'generated',
+        certificateId: 'MTVR-2026-11111111-2222-4333-8444-555555555555',
+    });
+    await assert.rejects(certificate.validate());
 });

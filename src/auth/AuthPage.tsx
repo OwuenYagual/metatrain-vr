@@ -27,7 +27,13 @@ export default function AuthPage() {
                 console.warn('No se pudo recuperar el progreso después del login:', progressError);
                 return null;
             });
-            navigate(progress?.status === 'in_progress' && session.participant.avatarId ? '/training' : '/avatar-selector');
+            if (!session.participant.avatarId) {
+                navigate('/avatar-selector');
+            } else if (progress?.status === 'approved' || progress?.status === 'failed') {
+                navigate('/evaluation');
+            } else {
+                navigate('/training');
+            }
         } catch (error: unknown) {
             setError(getErrorMessage(error, 'Credenciales inválidas.'));
         } finally {

@@ -16,6 +16,9 @@ Este estado del proyecto incluye:
 - Escenario de capacitación 3D con cinco estaciones interactivas.
 - Contenidos asociados mediante `interactionObjectId` estable.
 - Registro y recuperación de progreso por módulo.
+- Evaluación final de cinco preguntas, calificación segura y reintentos cuando no se alcanza el 70 %.
+- Emisión y descarga de un certificado PDF verificable para participantes aprobados.
+- Simulación formativa de tres decisiones con retroalimentación inmediata y avance persistente.
 - Cola offline para reintentar eventos cuando vuelve la conexión.
 - Modo de bajo rendimiento al detectar FPS críticos.
 - Validación de modelos y pruebas unitarias básicas.
@@ -91,8 +94,11 @@ src/
   avatar/       Selector y visor de avatares GLB
   config/       Parámetros centralizados
   content/      Acceso a contenidos
+  certificate/ Emisión y descarga de certificados
+  evaluation/   Preguntas, entrega y recuperación de resultados
   progress/     Recuperación de progreso
   scene/        Escenario, interacción y monitor de FPS
+  simulation/   Simulación formativa y recuperación de decisiones
   store/        Estado de capacitación
   training/     Orquestación del módulo
   utils/        Cola de sincronización offline
@@ -121,6 +127,15 @@ tests/          Pruebas unitarias
 | `POST` | `/api/progress/interaction` | Sí | Registrar una interacción. |
 | `POST` | `/api/progress/checkpoint` | Sí | Registrar un checkpoint. |
 | `POST` | `/api/progress/content` | Sí | Marcar contenido como completado. |
+| `GET` | `/api/simulation/:moduleId` | Sí | Recuperar escenario y decisiones guardadas. |
+| `POST` | `/api/simulation/:moduleId/decisions` | Sí | Validar y guardar una decisión en orden. |
+| `GET` | `/api/evaluation/:moduleId/questions` | Sí | Obtener preguntas sin exponer respuestas correctas. |
+| `GET` | `/api/evaluation/:moduleId/result` | Sí | Recuperar el resultado más reciente del participante. |
+| `POST` | `/api/evaluation/:moduleId/submit` | Sí | Validar, calificar y guardar un intento. |
+| `GET` | `/api/certificates/:moduleId` | Sí | Recuperar el certificado emitido. |
+| `POST` | `/api/certificates/:moduleId/issue` | Sí | Emitir de forma idempotente un certificado aprobado. |
+| `GET` | `/api/certificates/:moduleId/download` | Sí | Descargar el certificado PDF propio. |
+| `GET` | `/api/certificates/verify/:certificateId` | No | Verificar la autenticidad mediante su código. |
 
 Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad siempre se obtiene del JWT; el backend no confía en un `participantId` enviado dentro del cuerpo.
 
@@ -130,12 +145,18 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 2. El frontend consulta su progreso guardado.
 3. Si no hay progreso en curso, muestra los tres avatares 3D.
 4. El participante confirma un avatar y entra al módulo.
-5. El escenario carga cinco estaciones livianas.
-6. Cada interacción se guarda inmediatamente o queda en la cola offline.
-7. Al pulsar “Comprendido”, el contenido se marca como completado.
-8. El panel actualiza el contador, el porcentaje y el estado de cada contenido; la estación 3D recibe un marcador verde.
-9. Al volver a iniciar sesión, el avance se recupera desde el servidor y se reconstruye la misma vista.
-10. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
+5. El escenario carga cinco estaciones livianas y cuatro checkpoints ordenados.
+6. El participante visita los checkpoints con el puntero; solo el siguiente punto del recorrido está habilitado.
+7. Cada interacción se guarda inmediatamente o queda en la cola offline.
+8. Al pulsar “Comprendido”, el contenido se marca como completado.
+9. El panel actualiza los dos avances y la escena distingue checkpoints y contenidos completados.
+10. Al completar los cinco contenidos y los cuatro checkpoints, se habilita la simulación formativa.
+11. El participante completa tres decisiones secuenciales y recibe retroalimentación inmediata; la simulación no tiene nota.
+12. Al completar la simulación se habilita la evaluación final.
+13. El servidor valida todas las respuestas, calcula la nota y aprueba desde 70 %.
+14. Un resultado no aprobado puede reintentarse; una aprobación queda cerrada y se recupera al volver a iniciar sesión.
+15. El participante aprobado puede emitir y descargar un único certificado PDF con código de verificación.
+16. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
 
 ## 11. Criterios de aceptación
 
@@ -147,7 +168,15 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 - El escenario no solicita modelos locales inexistentes.
 - Los contenidos se enlazan por `interactionObjectId`, no por título.
 - El recorrido y el progreso contienen exactamente las cinco estaciones publicadas; los registros antiguos no vinculados quedan fuera.
+- El recorrido contiene cuatro checkpoints únicos, se visitan en orden y el backend rechaza IDs ajenos al módulo.
 - El avance guardado muestra contenidos revisados, porcentaje y marcadores 3D después de iniciar una nueva sesión.
+- La evaluación no entrega `correctOptionId` al frontend y rechaza preguntas, opciones o respuestas duplicadas inválidas.
+- La evaluación permanece bloqueada hasta completar exactamente los cinco contenidos y cuatro checkpoints vigentes.
+- La evaluación también exige completar las tres decisiones de la simulación; los resultados emitidos antes de este cambio conservan compatibilidad.
+- Las decisiones se guardan en orden y los datos ajenos al escenario activo no cuentan para completarlo.
+- La nota y el estado se recuperan después de cerrar e iniciar sesión.
+- Un participante no aprobado no puede emitir un certificado y no puede descargar el de otra persona.
+- El PDF se genera bajo demanda; la base conserva solo sus metadatos y código único.
 - Los eventos fallidos por red se sincronizan al reconectar.
 - TypeScript revisa frontend y backend de forma independiente.
 - Lint, pruebas y build deben terminar sin errores.
@@ -159,4 +188,4 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 - Los tres GLB de avatar se sirven temporalmente desde Three.js; producción debería alojarlos localmente.
 - El rate limit usa memoria del proceso; una instalación con varias réplicas requerirá Redis u otro almacenamiento compartido.
 - La cola offline conserva como máximo 250 solicitudes y no sustituye una estrategia de sincronización distribuida.
-- Simulación, evaluación completa, generación de certificado y dashboard administrativo permanecen como entregables posteriores de la propuesta técnica.
+- El dashboard administrativo permanece como entregable posterior de la propuesta técnica.

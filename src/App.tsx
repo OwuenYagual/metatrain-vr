@@ -6,6 +6,8 @@ import { authService } from './auth/authService';
 
 const AvatarSelector = lazy(() => import('./avatar/AvatarSelector'));
 const TrainingPage = lazy(() => import('./training/TrainingPage'));
+const EvaluationPage = lazy(() => import('./evaluation/EvaluationPage'));
+const SimulationPage = lazy(() => import('./simulation/SimulationPage'));
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
     return authService.getCurrentSession() ? children : <Navigate to="/login" replace />;
@@ -26,6 +28,12 @@ export default function App() {
                     } />
                     <Route path="/training" element={
                         <ProtectedRoute><TrainingPage /></ProtectedRoute>
+                    } />
+                    <Route path="/evaluation" element={
+                        <ProtectedRoute><EvaluationPage /></ProtectedRoute>
+                    } />
+                    <Route path="/simulation" element={
+                        <ProtectedRoute><SimulationPage /></ProtectedRoute>
                     } />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

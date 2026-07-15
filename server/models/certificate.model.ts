@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { MIN_PASSING_SCORE } from '../../shared/trainingModule';
 
 export interface ICertificate extends Document {
     participantId: mongoose.Types.ObjectId;
@@ -12,9 +13,9 @@ export interface ICertificate extends Document {
 
 const CertificateSchema = new Schema<ICertificate>({
     participantId: { type: Schema.Types.ObjectId, ref: 'Participant', required: true },
-    certificateId: { type: String },
+    certificateId: { type: String, trim: true, maxlength: 100 },
     moduleId: { type: String, required: true },
-    score: { type: Number, required: true },
+    score: { type: Number, required: true, min: 0, max: 100 },
     status: {
         type: String,
         enum: ['generated', 'blocked', 'not_generated'],
@@ -31,6 +32,7 @@ const CertificateSchema = new Schema<ICertificate>({
 CertificateSchema.pre('validate', function () {
     if (this.status === 'generated') {
         if (!this.certificateId) this.invalidate('certificateId', 'Un certificado generado requiere certificateId.');
+        if (this.score < MIN_PASSING_SCORE) this.invalidate('score', 'La nota no permite generar un certificado.');
         this.issuedAt ??= new Date();
         this.reason = undefined;
         return;
@@ -45,6 +47,6 @@ CertificateSchema.index(
     { certificateId: 1 },
     { unique: true, partialFilterExpression: { certificateId: { $type: 'string' } } }
 );
-CertificateSchema.index({ participantId: 1, moduleId: 1 });
+CertificateSchema.index({ participantId: 1, moduleId: 1 }, { unique: true });
 
 export default mongoose.model<ICertificate>('Certificate', CertificateSchema);
