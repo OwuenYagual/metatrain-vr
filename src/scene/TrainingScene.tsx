@@ -4,23 +4,16 @@ import { OrbitControls, useGLTF } from '@react-three/drei';
 import { interactionSystem } from './interactionSystem';
 import { useTrainingStore } from '../store/useTrainingStore';
 import { PerformanceMonitor } from './performanceMonitor';
+import { TRAINING_STATIONS } from '../../shared/trainingModule';
 
 type StationVariant = 'manual' | 'folder' | 'board' | 'shield' | 'terminal';
 
 type InteractiveProps = {
-    position: [number, number, number];
+    position: readonly [number, number, number];
     id: string;
     title: string;
     variant: StationVariant;
 };
-
-const STATIONS: InteractiveProps[] = [
-    { position: [-2.5, -0.5, -1], id: 'obj_manual', title: 'Políticas de la Empresa', variant: 'manual' },
-    { position: [2.5, -0.5, -1.5], id: 'obj_rrhh', title: 'Recursos Humanos', variant: 'folder' },
-    { position: [-1.5, -0.5, 2], id: 'obj_funciones', title: 'Funciones de tu Rol', variant: 'board' },
-    { position: [0, -0.5, -2.7], id: 'obj_seguridad', title: 'Seguridad Laboral', variant: 'shield' },
-    { position: [1.5, -0.5, 2.5], id: 'obj_examen', title: 'Evaluación Final', variant: 'terminal' },
-];
 
 function OfficeRoom() {
     const { scene } = useGLTF('/models/room.glb');
@@ -34,7 +27,7 @@ function ManualModel() {
     return <primitive object={manual} scale={0.8} />;
 }
 
-function StationVisual({ variant }: { variant: StationVariant }) {
+function StationVisual({ variant, completed }: { variant: StationVariant; completed: boolean }) {
     if (variant === 'manual') return <ManualModel />;
 
     const colors: Record<Exclude<StationVariant, 'manual'>, string> = {
@@ -50,14 +43,37 @@ function StationVisual({ variant }: { variant: StationVariant }) {
             {variant === 'folder' ? <boxGeometry args={[0.8, 0.55, 0.18]} /> : null}
             {variant === 'board' ? <boxGeometry args={[1.1, 0.65, 0.12]} /> : null}
             {variant === 'shield' ? <cylinderGeometry args={[0.45, 0.55, 0.18, 6]} /> : null}
-            <meshStandardMaterial color={colors[variant]} roughness={0.55} metalness={0.1} />
+            <meshStandardMaterial
+                color={completed ? '#16a34a' : colors[variant]}
+                emissive={completed ? '#14532d' : '#000000'}
+                emissiveIntensity={completed ? 0.35 : 0}
+                roughness={0.55}
+                metalness={0.1}
+            />
         </mesh>
+    );
+}
+
+function CompletedMarker() {
+    return (
+        <>
+            <mesh position={[0, -0.48, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.72, 0.07, 12, 32]} />
+                <meshStandardMaterial color="#22c55e" emissive="#166534" emissiveIntensity={0.65} />
+            </mesh>
+            <mesh position={[0, 0.9, 0]}>
+                <octahedronGeometry args={[0.18]} />
+                <meshStandardMaterial color="#22c55e" emissive="#166534" emissiveIntensity={0.75} />
+            </mesh>
+        </>
     );
 }
 
 function StationTrigger({ position, id, title, variant }: InteractiveProps) {
     const [hovered, setHovered] = useState(false);
-    const { contents, setActiveContent } = useTrainingStore();
+    const { contents, completedContentIds, setActiveContent } = useTrainingStore();
+    const linkedContent = contents.find((content) => content.interactionObjectId === id);
+    const completed = linkedContent ? completedContentIds.includes(linkedContent._id) : false;
 
     const handleClick = (event: ThreeEvent<MouseEvent>) => {
         event.stopPropagation();
@@ -65,7 +81,6 @@ function StationTrigger({ position, id, title, variant }: InteractiveProps) {
             console.error('No se pudo registrar la interacción:', error);
         });
 
-        const linkedContent = contents.find((content) => content.interactionObjectId === id);
         if (!linkedContent) {
             console.warn(`No existe contenido asociado a ${id} (${title}).`);
             return;
@@ -79,7 +94,7 @@ function StationTrigger({ position, id, title, variant }: InteractiveProps) {
 
     return (
         <group
-            position={position}
+            position={[...position] as [number, number, number]}
             scale={hovered ? 1.15 : 1}
             onClick={handleClick}
             onPointerOver={(event) => {
@@ -92,7 +107,8 @@ function StationTrigger({ position, id, title, variant }: InteractiveProps) {
                 document.body.style.cursor = 'auto';
             }}
         >
-            <StationVisual variant={variant} />
+            <StationVisual variant={variant} completed={completed} />
+            {completed && <CompletedMarker />}
         </group>
     );
 }
@@ -136,7 +152,7 @@ export default function TrainingScene() {
 
                 <Suspense fallback={null}>
                     <OfficeRoom />
-                    {STATIONS.map((station) => <StationTrigger key={station.id} {...station} />)}
+                    {TRAINING_STATIONS.map((station) => <StationTrigger key={station.id} {...station} />)}
                 </Suspense>
             </Canvas>
         </>

@@ -1,4 +1,5 @@
 import { apiFetch } from '../api/apiClient';
+import type { TrainingProgress } from '../progress/progressService';
 
 export type Content = {
     _id: string;
@@ -18,11 +19,16 @@ export const contentService = {
         return data as Content[];
     },
 
-    async markContentCompleted(moduleId: string, contentId: string): Promise<void> {
-        await apiFetch('/progress/content', {
+    async markContentCompleted(moduleId: string, contentId: string): Promise<TrainingProgress> {
+        const response = await apiFetch('/progress/content', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ moduleId, contentId }),
         });
+        const payload = await response.json() as { progress?: TrainingProgress };
+        if (!payload.progress || !Array.isArray(payload.progress.completedContents)) {
+            throw new Error('El servidor devolvió un progreso inválido.');
+        }
+        return payload.progress;
     },
 };

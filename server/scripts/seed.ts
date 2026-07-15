@@ -2,8 +2,9 @@ import mongoose from 'mongoose';
 import { env } from '../config/env';
 import TrainingContent from '../models/content.model';
 import Question from '../models/question.model';
+import { TRAINING_MODULE_ID } from '../../shared/trainingModule';
 
-const moduleId = 'induccion_001';
+const moduleId = TRAINING_MODULE_ID;
 
 const contents = [
     { interactionObjectId: 'obj_manual', title: 'Políticas de la Empresa', body: 'Conoce las políticas generales, los canales internos y las normas básicas de convivencia.', order: 1 },

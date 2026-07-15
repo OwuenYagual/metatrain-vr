@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import TrainingContent from '../models/content.model';
 import { authenticate } from '../middleware/auth.middleware';
 import { readRequiredString } from '../utils/validation';
+import { getModuleInteractionObjectIds } from '../../shared/trainingModule';
 
 const router = Router();
 
@@ -14,8 +15,12 @@ router.get('/:moduleId/contents', authenticate, async (req: Request, res: Respon
             res.status(400).json({ error: validation.error });
             return;
         }
-        // Buscamos los contenidos activos del módulo y los ordenamos por su secuencia
-        const contents = await TrainingContent.find({ moduleId: validation.value, active: true })
+        const interactionObjectIds = getModuleInteractionObjectIds(validation.value);
+        const contents = await TrainingContent.find({
+            moduleId: validation.value,
+            active: true,
+            ...(interactionObjectIds ? { interactionObjectId: { $in: interactionObjectIds } } : {}),
+        })
             .sort({ order: 1 })
             .lean();
         res.json(contents);
