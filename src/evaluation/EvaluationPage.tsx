@@ -9,14 +9,20 @@ import {
     type EvaluationQuestion,
     type EvaluationResult,
 } from './evaluationService';
+import {
+    certificateService,
+    type CertificateSummary,
+} from '../certificate/certificateService';
 
 export default function EvaluationPage() {
     const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [result, setResult] = useState<EvaluationResult | null>(null);
+    const [certificate, setCertificate] = useState<CertificateSummary | null>(null);
     const [passingScore, setPassingScore] = useState<number>(APP_CONFIG.MIN_PASSING_SCORE);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [downloadingCertificate, setDownloadingCertificate] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
     const session = authService.getCurrentSession();
@@ -30,11 +36,13 @@ export default function EvaluationPage() {
         Promise.all([
             evaluationService.getQuestions(APP_CONFIG.TRAINING_MODULE_ID, controller.signal),
             evaluationService.getLatestResult(APP_CONFIG.TRAINING_MODULE_ID, controller.signal),
+            certificateService.getCertificate(APP_CONFIG.TRAINING_MODULE_ID, controller.signal),
         ])
-            .then(([evaluation, latestResult]) => {
+            .then(([evaluation, latestResult, savedCertificate]) => {
                 setQuestions(evaluation.questions);
                 setPassingScore(evaluation.passingScore);
                 setResult(latestResult);
+                setCertificate(savedCertificate);
             })
             .catch((requestError: unknown) => {
                 if (!controller.signal.aborted) {
@@ -73,6 +81,28 @@ export default function EvaluationPage() {
         setAnswers({});
         setResult(null);
         setError('');
+    };
+
+    const downloadCertificate = async () => {
+        setDownloadingCertificate(true);
+        setError('');
+        try {
+            const issuedCertificate = await certificateService.issueCertificate(APP_CONFIG.TRAINING_MODULE_ID);
+            const pdf = await certificateService.downloadCertificate(APP_CONFIG.TRAINING_MODULE_ID);
+            const objectUrl = URL.createObjectURL(pdf);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = 'certificado-metatrain.pdf';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+            setCertificate(issuedCertificate);
+        } catch (requestError: unknown) {
+            setError(getErrorMessage(requestError, 'No se pudo descargar el certificado.'));
+        } finally {
+            setDownloadingCertificate(false);
+        }
     };
 
     const logout = () => {
@@ -124,6 +154,29 @@ export default function EvaluationPage() {
                             Respondiste correctamente {result.correctAnswers} de {result.totalQuestions} preguntas.
                             La nota mínima es {passingScore}%.
                         </p>
+                        {result.status === 'approved' && APP_CONFIG.CERTIFICATE_ENABLED && (
+                            <section aria-labelledby="certificate-title" style={{ marginTop: '1.25rem', padding: '1rem', background: '#eff6ff', color: '#1e3a8a', borderRadius: 10 }}>
+                                <h3 id="certificate-title" style={{ margin: '0 0 0.5rem' }}>Certificado de aprobación</h3>
+                                <p>El certificado incluye tu nombre, nota, fecha de emisión y un código único de verificación.</p>
+                                {certificate && (
+                                    <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', overflowWrap: 'anywhere' }}>
+                                        Código: {certificate.certificateId}
+                                    </p>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => void downloadCertificate()}
+                                    disabled={downloadingCertificate}
+                                    style={{ marginTop: '0.8rem', padding: '0.75rem 1rem', background: '#1d4ed8', color: '#fff', border: 0, borderRadius: 8, fontWeight: 700 }}
+                                >
+                                    {downloadingCertificate
+                                        ? 'Preparando certificado...'
+                                        : certificate
+                                            ? 'Descargar certificado nuevamente'
+                                            : 'Emitir y descargar certificado'}
+                                </button>
+                            </section>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.5rem' }}>
                             {result.status === 'failed' && (
                                 <button type="button" onClick={retryEvaluation} style={{ padding: '0.75rem 1rem', background: '#2563eb', color: '#fff', border: 0, borderRadius: 8, fontWeight: 700 }}>

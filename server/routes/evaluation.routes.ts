@@ -17,6 +17,7 @@ import {
     getModuleInteractionObjectIds,
     MIN_PASSING_SCORE,
 } from '../../shared/trainingModule';
+import { getCompletedSimulationDecisionIds, SIMULATION_DECISION_IDS } from '../domain/simulation';
 
 const router = Router();
 const evaluationSubmitRateLimit = createRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 });
@@ -67,16 +68,23 @@ async function getEligibleProgress(
     }
 
     const progress = await TrainingProgress.findOne({ participantId, moduleId });
+    const hasPreviousEvaluation = Boolean(await EvaluationResult.exists({ participantId, moduleId }));
+    const requiredSimulationDecisionIds = hasPreviousEvaluation ? [] : SIMULATION_DECISION_IDS;
     const requirements = summarizeEvaluationRequirements({
         requiredContentIds: requiredContents.map((content) => String(content._id)),
         completedContentIds: progress?.completedContents ?? [],
         requiredCheckpointIds: checkpointIds,
         visitedCheckpointIds: progress?.visitedCheckpoints ?? [],
+        requiredSimulationDecisionIds,
+        completedSimulationDecisionIds: progress
+            ? getCompletedSimulationDecisionIds(progress.simulationDecisions)
+            : [],
+        simulationGrandfathered: hasPreviousEvaluation,
     });
 
     if (!progress || !requirements.eligible) {
         res.status(409).json({
-            error: 'Completa los cinco contenidos y los cuatro checkpoints antes de iniciar la evaluación.',
+            error: 'Completa los cinco contenidos, los cuatro checkpoints y la simulación antes de iniciar la evaluación.',
             requirements,
         });
         return null;

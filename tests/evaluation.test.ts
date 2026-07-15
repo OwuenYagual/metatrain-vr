@@ -77,10 +77,40 @@ test('exige completar contenidos y checkpoints canónicos', () => {
         completedContentIds: ['c1', 'c2', 'c3', 'c4', 'contenido_antiguo'],
         requiredCheckpointIds: ['p1', 'p2', 'p3', 'p4'],
         visitedCheckpointIds: ['p1', 'p2', 'p3', 'p4', 'checkpoint_antiguo'],
+        requiredSimulationDecisionIds: ['d1', 'd2', 'd3'],
+        completedSimulationDecisionIds: ['d1', 'd2'],
     });
     assert.deepEqual(requirements, {
         contents: { completed: 4, required: 5 },
         checkpoints: { completed: 4, required: 4 },
+        simulation: { completed: 2, required: 3, grandfathered: false },
         eligible: false,
     });
+});
+
+test('habilita la evaluación cuando recorrido y simulación están completos', () => {
+    const requirements = summarizeEvaluationRequirements({
+        requiredContentIds: ['c1', 'c2'],
+        completedContentIds: ['c1', 'c2'],
+        requiredCheckpointIds: ['p1', 'p2'],
+        visitedCheckpointIds: ['p1', 'p2'],
+        requiredSimulationDecisionIds: ['d1', 'd2', 'd3'],
+        completedSimulationDecisionIds: ['d1', 'd2', 'd3'],
+    });
+    assert.equal(requirements.eligible, true);
+    assert.deepEqual(requirements.simulation, { completed: 3, required: 3, grandfathered: false });
+});
+
+test('conserva compatibilidad para una evaluación emitida antes de la simulación', () => {
+    const requirements = summarizeEvaluationRequirements({
+        requiredContentIds: ['c1'],
+        completedContentIds: ['c1'],
+        requiredCheckpointIds: ['p1'],
+        visitedCheckpointIds: ['p1'],
+        requiredSimulationDecisionIds: [],
+        completedSimulationDecisionIds: [],
+        simulationGrandfathered: true,
+    });
+    assert.equal(requirements.eligible, true);
+    assert.deepEqual(requirements.simulation, { completed: 0, required: 0, grandfathered: true });
 });

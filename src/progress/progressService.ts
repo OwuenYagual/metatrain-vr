@@ -5,6 +5,9 @@ export type TrainingProgress = {
     moduleId: string;
     visitedCheckpoints: string[];
     completedContents: string[];
+    simulationDecisionCount: number;
+    completedSimulationDecisionIds: string[];
+    simulationCompleted: boolean;
     score: number | null;
     status: 'not_started' | 'in_progress' | 'approved' | 'failed';
     durationSeconds: number;

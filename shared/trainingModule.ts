@@ -1,4 +1,5 @@
 export const TRAINING_MODULE_ID = 'induccion_001';
+export const TRAINING_MODULE_TITLE = 'Inducción Corporativa';
 export const MIN_PASSING_SCORE = 70;
 
 export const TRAINING_STATIONS = [

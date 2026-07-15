@@ -32,6 +32,7 @@ export default function TrainingPage() {
     const [checkpointNotice, setCheckpointNotice] = useState('');
     const [moduleStatus, setModuleStatus] = useState<'not_started' | 'in_progress' | 'approved' | 'failed'>('not_started');
     const [moduleScore, setModuleScore] = useState<number | null>(null);
+    const [simulationCompleted, setSimulationCompleted] = useState(false);
     const navigate = useNavigate();
     const session = authService.getCurrentSession();
     const participantId = session?.participant.id;
@@ -57,6 +58,8 @@ export default function TrainingPage() {
         && contentProgress.completedCount === contentProgress.totalCount;
     const requiredCheckpointsCompleted = checkpointProgress.completedCount === APP_CONFIG.MIN_REQUIRED_CHECKPOINTS;
     const guidedRouteCompleted = requiredContentsCompleted && requiredCheckpointsCompleted;
+    const moduleFinalized = moduleStatus === 'approved' || moduleStatus === 'failed';
+    const evaluationAvailable = simulationCompleted || moduleFinalized;
     const activeContentCompleted = activeContent
         ? completedContentSet.has(activeContent._id)
         : false;
@@ -87,6 +90,7 @@ export default function TrainingPage() {
                 setVisitedCheckpointIds(savedProgress?.visitedCheckpoints ?? []);
                 setModuleStatus(savedProgress?.status ?? 'not_started');
                 setModuleScore(savedProgress?.score ?? null);
+                setSimulationCompleted(savedProgress?.simulationCompleted ?? false);
             })
             .catch((requestError: unknown) => {
                 if (!controller.signal.aborted) {
@@ -125,6 +129,7 @@ export default function TrainingPage() {
             setCompletedContentIds(savedProgress.completedContents);
             setModuleStatus(savedProgress.status);
             setModuleScore(savedProgress.score);
+            setSimulationCompleted(savedProgress.simulationCompleted);
             setActiveContent(null);
         } catch (requestError: unknown) {
             setError(getErrorMessage(requestError, 'No se pudo guardar el contenido completado.'));
@@ -212,23 +217,27 @@ export default function TrainingPage() {
                     </section>
                 )}
                 {guidedRouteCompleted ? (
-                    <section style={{ padding: '0.75rem', margin: '0.9rem 0 0', background: '#dcfce7', color: '#166534', borderRadius: 6 }}>
+                    <section style={{ padding: '0.75rem', margin: '0.9rem 0 0', background: evaluationAvailable ? '#dcfce7' : '#fff7ed', color: evaluationAvailable ? '#166534' : '#9a3412', borderRadius: 6 }}>
                         <p role="status" style={{ fontWeight: 600 }}>
-                            Recorrido completo: la evaluación final está habilitada.
+                            {evaluationAvailable
+                                ? 'Recorrido y simulación completos: la evaluación final está habilitada.'
+                                : 'Recorrido completo: realiza la simulación de decisiones para continuar.'}
                         </p>
-                        {(moduleStatus === 'approved' || moduleStatus === 'failed') && moduleScore !== null && (
+                        {moduleFinalized && moduleScore !== null && (
                             <p style={{ marginTop: '0.4rem' }}>
                                 Último resultado: {moduleScore}% · {moduleStatus === 'approved' ? 'Aprobado' : 'No aprobado'}
                             </p>
                         )}
                         <button
                             type="button"
-                            onClick={() => navigate('/evaluation')}
-                            style={{ marginTop: '0.65rem', padding: '0.65rem 0.8rem', background: '#166534', color: '#fff', border: 0, borderRadius: 6, fontWeight: 700 }}
+                            onClick={() => navigate(evaluationAvailable ? '/evaluation' : '/simulation')}
+                            style={{ marginTop: '0.65rem', padding: '0.65rem 0.8rem', background: evaluationAvailable ? '#166534' : '#c2410c', color: '#fff', border: 0, borderRadius: 6, fontWeight: 700 }}
                         >
-                            {moduleStatus === 'approved' || moduleStatus === 'failed'
+                            {moduleFinalized
                                 ? 'Ver resultado de la evaluación'
-                                : 'Iniciar evaluación final'}
+                                : simulationCompleted
+                                    ? 'Iniciar evaluación final'
+                                    : 'Iniciar simulación'}
                         </button>
                     </section>
                 ) : requiredContentsCompleted ? (

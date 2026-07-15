@@ -40,9 +40,9 @@ const InteractionEventSchema = new Schema<IInteractionEvent>({
 // Subesquema de Decisiones
 const SimulationDecisionSchema = new Schema<ISimulationDecision>({
     participantId: { type: Schema.Types.ObjectId, ref: 'Participant', required: true },
-    scenarioId: { type: String, required: true },
-    decisionId: { type: String, required: true },
-    selectedOptionId: { type: String, required: true },
+    scenarioId: { type: String, required: true, maxlength: 100 },
+    decisionId: { type: String, required: true, maxlength: 100 },
+    selectedOptionId: { type: String, required: true, maxlength: 100 },
     timestamp: { type: Date, default: Date.now }
 }, { _id: false });
 

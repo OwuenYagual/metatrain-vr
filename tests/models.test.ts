@@ -67,3 +67,14 @@ test('un certificado no generado no recibe ID ni fecha de emisión', async () =>
     assert.equal(certificate.certificateId, undefined);
     assert.equal(certificate.issuedAt, undefined);
 });
+
+test('un certificado generado exige una nota aprobatoria', async () => {
+    const certificate = new Certificate({
+        participantId: '507f1f77bcf86cd799439011',
+        moduleId: 'induccion_001',
+        score: 60,
+        status: 'generated',
+        certificateId: 'MTVR-2026-11111111-2222-4333-8444-555555555555',
+    });
+    await assert.rejects(certificate.validate());
+});

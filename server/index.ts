@@ -9,6 +9,8 @@ import trainingRoutes from './routes/training.routes';
 import avatarRoutes from './routes/avatar.routes';
 import participantRoutes from './routes/participant.routes';
 import evaluationRoutes from './routes/evaluation.routes';
+import certificateRoutes from './routes/certificate.routes';
+import simulationRoutes from './routes/simulation.routes';
 
 const app = express();
 app.use(cors({
@@ -31,6 +33,8 @@ app.use('/api/training', trainingRoutes);
 app.use('/api/avatars', avatarRoutes);
 app.use('/api/participants', participantRoutes);
 app.use('/api/evaluation', evaluationRoutes);
+app.use('/api/certificates', certificateRoutes);
+app.use('/api/simulation', simulationRoutes);
 
 //Endpoint de prueba
 app.get('/api/health', (_req, res) => {

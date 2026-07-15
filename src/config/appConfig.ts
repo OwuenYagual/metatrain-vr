@@ -19,7 +19,7 @@ export const APP_CONFIG = {
     MIN_REQUIRED_INTERACTIONS: 3,
     MIN_REQUIRED_CHECKPOINTS: TRAINING_CHECKPOINTS.length,
     MIN_REQUIRED_CONTENTS: TRAINING_STATIONS.length,
-    CERTIFICATE_ENABLED: false,
+    CERTIFICATE_ENABLED: true,
     // El MVP usa puntero/raycast. Una futura entrada WebXR deberá consumir los mismos servicios de interacción.
     IMMERSIVE_INPUT_MODE: 'pointer',
 } as const;

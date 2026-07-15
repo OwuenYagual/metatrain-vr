@@ -11,6 +11,7 @@ import {
     getModuleInteractionObjectIds,
     getNextTrainingCheckpointId,
 } from '../../shared/trainingModule';
+import { getCompletedSimulationDecisionIds, SIMULATION_DECISION_IDS } from '../domain/simulation';
 
 const router = Router();
 const MAX_STORED_INTERACTIONS = 1000;
@@ -18,6 +19,7 @@ const MAX_STORED_INTERACTIONS = 1000;
 router.use(authenticate);
 
 function progressSummary(progress: ITrainingProgress) {
+    const completedSimulationDecisionIds = getCompletedSimulationDecisionIds(progress.simulationDecisions);
     return {
         participantId: progress.participantId,
         moduleId: progress.moduleId,
@@ -25,6 +27,8 @@ function progressSummary(progress: ITrainingProgress) {
         completedContents: progress.completedContents,
         interactionCount: progress.interactions.length,
         simulationDecisionCount: progress.simulationDecisions.length,
+        completedSimulationDecisionIds,
+        simulationCompleted: completedSimulationDecisionIds.length === SIMULATION_DECISION_IDS.length,
         score: progress.score,
         status: progress.status,
         durationSeconds: progress.durationSeconds,
