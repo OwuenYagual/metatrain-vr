@@ -1,4 +1,5 @@
 export const TRAINING_MODULE_ID = 'induccion_001';
+export const MIN_PASSING_SCORE = 70;
 
 export const TRAINING_STATIONS = [
     { position: [-2.5, -0.5, -1], id: 'obj_manual', title: 'Políticas de la Empresa', variant: 'manual' },

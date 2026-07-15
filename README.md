@@ -16,6 +16,7 @@ Este estado del proyecto incluye:
 - Escenario de capacitación 3D con cinco estaciones interactivas.
 - Contenidos asociados mediante `interactionObjectId` estable.
 - Registro y recuperación de progreso por módulo.
+- Evaluación final de cinco preguntas, calificación segura y reintentos cuando no se alcanza el 70 %.
 - Cola offline para reintentar eventos cuando vuelve la conexión.
 - Modo de bajo rendimiento al detectar FPS críticos.
 - Validación de modelos y pruebas unitarias básicas.
@@ -91,6 +92,7 @@ src/
   avatar/       Selector y visor de avatares GLB
   config/       Parámetros centralizados
   content/      Acceso a contenidos
+  evaluation/   Preguntas, entrega y recuperación de resultados
   progress/     Recuperación de progreso
   scene/        Escenario, interacción y monitor de FPS
   store/        Estado de capacitación
@@ -121,6 +123,9 @@ tests/          Pruebas unitarias
 | `POST` | `/api/progress/interaction` | Sí | Registrar una interacción. |
 | `POST` | `/api/progress/checkpoint` | Sí | Registrar un checkpoint. |
 | `POST` | `/api/progress/content` | Sí | Marcar contenido como completado. |
+| `GET` | `/api/evaluation/:moduleId/questions` | Sí | Obtener preguntas sin exponer respuestas correctas. |
+| `GET` | `/api/evaluation/:moduleId/result` | Sí | Recuperar el resultado más reciente del participante. |
+| `POST` | `/api/evaluation/:moduleId/submit` | Sí | Validar, calificar y guardar un intento. |
 
 Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad siempre se obtiene del JWT; el backend no confía en un `participantId` enviado dentro del cuerpo.
 
@@ -135,8 +140,10 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 7. Cada interacción se guarda inmediatamente o queda en la cola offline.
 8. Al pulsar “Comprendido”, el contenido se marca como completado.
 9. El panel actualiza los dos avances y la escena distingue checkpoints y contenidos completados.
-10. Al volver a iniciar sesión, el avance se recupera desde el servidor y se reconstruye la misma vista.
-11. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
+10. Al completar los cinco contenidos y los cuatro checkpoints, se habilita la evaluación final.
+11. El servidor valida todas las respuestas, calcula la nota y aprueba desde 70 %.
+12. Un resultado no aprobado puede reintentarse; una aprobación queda cerrada y se recupera al volver a iniciar sesión.
+13. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
 
 ## 11. Criterios de aceptación
 
@@ -150,6 +157,9 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 - El recorrido y el progreso contienen exactamente las cinco estaciones publicadas; los registros antiguos no vinculados quedan fuera.
 - El recorrido contiene cuatro checkpoints únicos, se visitan en orden y el backend rechaza IDs ajenos al módulo.
 - El avance guardado muestra contenidos revisados, porcentaje y marcadores 3D después de iniciar una nueva sesión.
+- La evaluación no entrega `correctOptionId` al frontend y rechaza preguntas, opciones o respuestas duplicadas inválidas.
+- La evaluación permanece bloqueada hasta completar exactamente los cinco contenidos y cuatro checkpoints vigentes.
+- La nota y el estado se recuperan después de cerrar e iniciar sesión.
 - Los eventos fallidos por red se sincronizan al reconectar.
 - TypeScript revisa frontend y backend de forma independiente.
 - Lint, pruebas y build deben terminar sin errores.
@@ -161,4 +171,4 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 - Los tres GLB de avatar se sirven temporalmente desde Three.js; producción debería alojarlos localmente.
 - El rate limit usa memoria del proceso; una instalación con varias réplicas requerirá Redis u otro almacenamiento compartido.
 - La cola offline conserva como máximo 250 solicitudes y no sustituye una estrategia de sincronización distribuida.
-- Simulación, evaluación completa, generación de certificado y dashboard administrativo permanecen como entregables posteriores de la propuesta técnica.
+- Simulación, generación de certificado y dashboard administrativo permanecen como entregables posteriores de la propuesta técnica.

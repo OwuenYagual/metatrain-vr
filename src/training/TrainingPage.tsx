@@ -30,6 +30,8 @@ export default function TrainingPage() {
     const [error, setError] = useState('');
     const [savingContent, setSavingContent] = useState(false);
     const [checkpointNotice, setCheckpointNotice] = useState('');
+    const [moduleStatus, setModuleStatus] = useState<'not_started' | 'in_progress' | 'approved' | 'failed'>('not_started');
+    const [moduleScore, setModuleScore] = useState<number | null>(null);
     const navigate = useNavigate();
     const session = authService.getCurrentSession();
     const participantId = session?.participant.id;
@@ -83,6 +85,8 @@ export default function TrainingPage() {
                 setContents(loadedContents);
                 setCompletedContentIds(savedProgress?.completedContents ?? []);
                 setVisitedCheckpointIds(savedProgress?.visitedCheckpoints ?? []);
+                setModuleStatus(savedProgress?.status ?? 'not_started');
+                setModuleScore(savedProgress?.score ?? null);
             })
             .catch((requestError: unknown) => {
                 if (!controller.signal.aborted) {
@@ -119,6 +123,8 @@ export default function TrainingPage() {
                 activeContent._id,
             );
             setCompletedContentIds(savedProgress.completedContents);
+            setModuleStatus(savedProgress.status);
+            setModuleScore(savedProgress.score);
             setActiveContent(null);
         } catch (requestError: unknown) {
             setError(getErrorMessage(requestError, 'No se pudo guardar el contenido completado.'));
@@ -206,9 +212,25 @@ export default function TrainingPage() {
                     </section>
                 )}
                 {guidedRouteCompleted ? (
-                    <p role="status" style={{ padding: '0.75rem', margin: '0.9rem 0 0', background: '#dcfce7', color: '#166534', borderRadius: 6, fontWeight: 600 }}>
-                        Recorrido completo: visitaste los cuatro checkpoints y revisaste los cinco contenidos. Tu avance está guardado.
-                    </p>
+                    <section style={{ padding: '0.75rem', margin: '0.9rem 0 0', background: '#dcfce7', color: '#166534', borderRadius: 6 }}>
+                        <p role="status" style={{ fontWeight: 600 }}>
+                            Recorrido completo: la evaluación final está habilitada.
+                        </p>
+                        {(moduleStatus === 'approved' || moduleStatus === 'failed') && moduleScore !== null && (
+                            <p style={{ marginTop: '0.4rem' }}>
+                                Último resultado: {moduleScore}% · {moduleStatus === 'approved' ? 'Aprobado' : 'No aprobado'}
+                            </p>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => navigate('/evaluation')}
+                            style={{ marginTop: '0.65rem', padding: '0.65rem 0.8rem', background: '#166534', color: '#fff', border: 0, borderRadius: 6, fontWeight: 700 }}
+                        >
+                            {moduleStatus === 'approved' || moduleStatus === 'failed'
+                                ? 'Ver resultado de la evaluación'
+                                : 'Iniciar evaluación final'}
+                        </button>
+                    </section>
                 ) : requiredContentsCompleted ? (
                     <p role="status" style={{ padding: '0.65rem', margin: '0.9rem 0 0', background: '#eff6ff', color: '#1d4ed8', borderRadius: 6 }}>
                         Has revisado todos los contenidos. Completa los checkpoints pendientes.

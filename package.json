@@ -14,7 +14,7 @@
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.server.json",
     "build": "tsc -p tsconfig.app.json && tsc -p tsconfig.server.json && vite build",
     "lint": "eslint .",
-    "test": "tsx --test tests/validation.test.ts tests/progress.test.ts tests/contentProgress.test.ts tests/models.test.ts",
+    "test": "tsx --test tests/validation.test.ts tests/progress.test.ts tests/contentProgress.test.ts tests/evaluation.test.ts tests/models.test.ts",
     "seed": "tsx server/scripts/seed.ts"
   },
   "dependencies": {

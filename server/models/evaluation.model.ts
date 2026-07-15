@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { MIN_PASSING_SCORE } from '../../shared/trainingModule';
 
 export interface IEvaluationResult extends Document {
     participantId: mongoose.Types.ObjectId;
@@ -32,12 +33,21 @@ const EvaluationResultSchema = new Schema<IEvaluationResult>({
         required: true,
         validate: {
             validator(this: IEvaluationResult, value: IEvaluationResult['status']) {
-                return value === (this.score >= 70 ? 'approved' : 'failed');
+                return value === (this.score >= MIN_PASSING_SCORE ? 'approved' : 'failed');
             },
             message: 'El estado no coincide con la puntuación.'
         }
     },
     createdAt: { type: Date, default: Date.now }
+});
+
+EvaluationResultSchema.pre('validate', function () {
+    if (this.totalQuestions > 0 && this.correctAnswers <= this.totalQuestions) {
+        const expectedScore = Math.round((this.correctAnswers / this.totalQuestions) * 100);
+        if (this.score !== expectedScore) {
+            this.invalidate('score', 'La puntuación no coincide con las respuestas correctas.');
+        }
+    }
 });
 
 EvaluationResultSchema.index({ participantId: 1, moduleId: 1, createdAt: -1 });
