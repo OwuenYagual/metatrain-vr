@@ -1,0 +1,65 @@
+.station-label {
+    font: inherit;
+    display: grid;
+    gap: 0.15rem;
+    min-width: 138px;
+    border: 1px solid rgba(148, 163, 184, 0.8);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+    padding: 0.42rem 0.55rem;
+    color: #172033;
+    text-align: center;
+    transition: transform 160ms ease, border-color 160ms ease;
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+}
+
+.station-label.is-hovered {
+    transform: translateY(-4px) scale(1.04);
+    border-color: #4f46e5;
+}
+
+.station-label.is-completed {
+    border-color: #22c55e;
+    background: rgba(240, 253, 244, 0.94);
+}
+
+.station-label span {
+    color: #4f46e5;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.station-label.is-completed span {
+    color: #166534;
+}
+
+.station-label strong {
+    font-size: 0.84rem;
+    line-height: 1.2;
+}
+
+.station-label small {
+    color: #64748b;
+    font-size: 0.7rem;
+}
+
+.checkpoint-label {
+    font: inherit;
+    white-space: nowrap;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.92);
+    box-shadow: 0 5px 16px rgba(30, 64, 175, 0.25);
+    padding: 0.35rem 0.6rem;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.checkpoint-label.is-visited {
+    background: rgba(22, 101, 52, 0.92);
+}

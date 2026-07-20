@@ -14,6 +14,8 @@ import {
     TRAINING_CHECKPOINT_IDS,
     TRAINING_CHECKPOINTS,
 } from '../../shared/trainingModule';
+import InductionActivityPanel from '../induction/InductionActivityPanel';
+import './TrainingPage.css';
 
 export default function TrainingPage() {
     const {
@@ -144,15 +146,10 @@ export default function TrainingPage() {
     };
 
     return (
-        <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-            <section style={{
-                position: 'absolute', top: 20, left: 20, zIndex: 10,
-                width: 'min(420px, calc(100vw - 40px))', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto',
-                background: 'rgba(255, 255, 255, 0.94)', padding: '1rem 1.25rem',
-                borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', textAlign: 'left', boxSizing: 'border-box',
-            }}>
-                <h1 style={{ margin: 0, fontSize: '1.35rem' }}>Módulo 1: Inducción</h1>
-                <p>Visita los cuatro checkpoints en orden e interactúa con los cinco objetos usando el puntero.</p>
+        <main className="training-page">
+            <section className="training-hud">
+                <h1 style={{ margin: 0, fontSize: '1.35rem' }}>Inducción: conoce tu empresa</h1>
+                <p>Recorre la oficina y supera cinco actividades sobre políticas, personas, departamentos y tu puesto.</p>
                 {loading && <p>Cargando contenidos...</p>}
                 {!loading && (
                     <section aria-labelledby="checkpoint-progress-title" aria-live="polite" style={{ marginTop: '0.85rem' }}>
@@ -189,7 +186,7 @@ export default function TrainingPage() {
                     <section aria-labelledby="content-progress-title" aria-live="polite" style={{ borderTop: '1px solid #cbd5e1', paddingTop: '0.75rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'baseline' }}>
                             <h2 id="content-progress-title" style={{ margin: '0 0 0.4rem', fontSize: '1rem' }}>
-                                Avance de contenidos
+                                Estaciones interactivas
                             </h2>
                             <strong>{contentProgress.completedCount} de {contentProgress.totalCount}</strong>
                         </div>
@@ -200,16 +197,32 @@ export default function TrainingPage() {
                             style={{ width: '100%', height: '1rem', accentColor: '#16a34a' }}
                         />
                         <p style={{ margin: '0.25rem 0 0.75rem', fontSize: '0.9rem' }}>
-                            {contentProgress.percentage}% revisado
+                            {contentProgress.percentage}% completado
                         </p>
                         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.3rem' }}>
                             {contents.map((content) => {
                                 const completed = completedContentSet.has(content._id);
                                 return (
-                                    <li key={content._id} style={{ color: completed ? '#166534' : '#475569' }}>
-                                        <span aria-hidden="true">{completed ? '✓' : '○'}</span>{' '}
-                                        {content.title}
-                                        <span style={{ fontSize: '0.85rem' }}> — {completed ? 'Revisado' : 'Pendiente'}</span>
+                                    <li key={content._id}>
+                                        <button
+                                            type="button"
+                                            aria-label={`Abrir actividad: ${content.title}`}
+                                            onClick={() => setActiveContent(content)}
+                                            style={{
+                                                width: '100%',
+                                                border: `1px solid ${completed ? '#86efac' : '#cbd5e1'}`,
+                                                borderRadius: 6,
+                                                background: completed ? '#f0fdf4' : '#f8fafc',
+                                                padding: '0.42rem 0.55rem',
+                                                color: completed ? '#166534' : '#334155',
+                                                textAlign: 'left',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            <span aria-hidden="true">{completed ? '✓' : '○'}</span>{' '}
+                                            {content.title}
+                                            <span style={{ fontSize: '0.85rem' }}> — {completed ? 'Superada' : 'Pendiente'}</span>
+                                        </button>
                                     </li>
                                 );
                             })}
@@ -220,8 +233,8 @@ export default function TrainingPage() {
                     <section style={{ padding: '0.75rem', margin: '0.9rem 0 0', background: evaluationAvailable ? '#dcfce7' : '#fff7ed', color: evaluationAvailable ? '#166534' : '#9a3412', borderRadius: 6 }}>
                         <p role="status" style={{ fontWeight: 600 }}>
                             {evaluationAvailable
-                                ? 'Recorrido y simulación completos: la evaluación final está habilitada.'
-                                : 'Recorrido completo: realiza la simulación de decisiones para continuar.'}
+                                ? 'Inducción y reto de integración completos: la evaluación final está habilitada.'
+                                : 'Recorrido completo: aplica lo aprendido en el reto de tu primer día.'}
                         </p>
                         {moduleFinalized && moduleScore !== null && (
                             <p style={{ marginTop: '0.4rem' }}>
@@ -237,16 +250,16 @@ export default function TrainingPage() {
                                 ? 'Ver resultado de la evaluación'
                                 : simulationCompleted
                                     ? 'Iniciar evaluación final'
-                                    : 'Iniciar simulación'}
+                                    : 'Iniciar reto de integración'}
                         </button>
                     </section>
                 ) : requiredContentsCompleted ? (
                     <p role="status" style={{ padding: '0.65rem', margin: '0.9rem 0 0', background: '#eff6ff', color: '#1d4ed8', borderRadius: 6 }}>
-                        Has revisado todos los contenidos. Completa los checkpoints pendientes.
+                        Has superado todas las actividades. Completa los checkpoints pendientes.
                     </p>
                 ) : requiredCheckpointsCompleted ? (
                     <p role="status" style={{ padding: '0.65rem', margin: '0.9rem 0 0', background: '#eff6ff', color: '#1d4ed8', borderRadius: 6 }}>
-                        Has visitado todos los checkpoints. Revisa los contenidos pendientes.
+                        Has visitado todos los checkpoints. Supera las estaciones pendientes.
                     </p>
                 ) : null}
                 {checkpointNotice && <p role="status" style={{ marginTop: '0.65rem', color: '#166534' }}>{checkpointNotice}</p>}
@@ -260,29 +273,17 @@ export default function TrainingPage() {
             </section>
 
             {activeContent && (
-                <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
-                    <section role="dialog" aria-modal="true" aria-labelledby="content-title" style={{
-                        background: '#fff', padding: '2rem', borderRadius: '12px', color: '#172033',
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.3)', maxWidth: '560px', width: '100%', textAlign: 'left',
-                    }}>
-                        <h2 id="content-title" style={{ marginTop: 0 }}>{activeContent.title}</h2>
-                        <p style={{ lineHeight: 1.6 }}>{activeContent.body}</p>
-                        {activeContentCompleted && (
-                            <p role="status" style={{ color: '#166534', fontWeight: 600 }}>
-                                Este contenido ya fue revisado.
-                            </p>
-                        )}
-                        <button type="button" onClick={completeActiveContent} disabled={savingContent} style={{
-                            marginTop: '1rem', width: '100%', padding: '0.75rem', background: '#2563eb',
-                            color: '#fff', border: 0, borderRadius: '6px', cursor: 'pointer', fontWeight: 700,
-                        }}>
-                            {savingContent ? 'Guardando...' : activeContentCompleted ? 'Cerrar' : 'Comprendido'}
-                        </button>
-                    </section>
-                </div>
+                <InductionActivityPanel
+                    key={activeContent._id}
+                    content={activeContent}
+                    alreadyCompleted={activeContentCompleted}
+                    saving={savingContent}
+                    onComplete={() => void completeActiveContent()}
+                    onClose={() => setActiveContent(null)}
+                />
             )}
 
-            <div style={{ width: '100%', height: '100%' }}>
+            <div className="training-scene-shell">
                 <SceneErrorBoundary>
                     <TrainingScene
                         onCheckpointSaved={(message) => {

@@ -26,15 +26,16 @@ test('el contrato público no expone retroalimentación ni la opción recomendad
 });
 
 test('valida los identificadores de una decisión de simulación', () => {
+    const firstOptionId = TRAINING_SIMULATION.decisions[0].options[0].id;
     const valid = validateSimulationDecisionInput({
         scenarioId: TRAINING_SIMULATION.id,
         decisionId: SIMULATION_DECISION_IDS[0],
-        selectedOptionId: 'aislar_reportar',
+        selectedOptionId: firstOptionId,
     });
     const invalid = validateSimulationDecisionInput({
         scenarioId: TRAINING_SIMULATION.id,
         decisionId: '',
-        selectedOptionId: 'aislar_reportar',
+        selectedOptionId: firstOptionId,
     });
     assert.equal(valid.ok, true);
     assert.equal(invalid.ok, false);
@@ -45,12 +46,12 @@ test('determina la siguiente decisión sin contar datos desconocidos', () => {
         {
             scenarioId: TRAINING_SIMULATION.id,
             decisionId: SIMULATION_DECISION_IDS[0],
-            selectedOptionId: 'aislar_reportar',
+            selectedOptionId: TRAINING_SIMULATION.decisions[0].options[0].id,
         },
         {
             scenarioId: 'escenario_antiguo',
             decisionId: SIMULATION_DECISION_IDS[1],
-            selectedOptionId: 'mantener_protocolo',
+            selectedOptionId: TRAINING_SIMULATION.decisions[1].options[0].id,
         },
         {
             scenarioId: TRAINING_SIMULATION.id,
@@ -60,6 +61,13 @@ test('determina la siguiente decisión sin contar datos desconocidos', () => {
     ];
     assert.deepEqual(getCompletedSimulationDecisionIds(storedDecisions), [SIMULATION_DECISION_IDS[0]]);
     assert.equal(getNextSimulationDecisionId(storedDecisions), SIMULATION_DECISION_IDS[1]);
+});
+
+test('la simulación integra políticas, departamentos y funciones del puesto', () => {
+    const scenarioText = JSON.stringify(publicSimulationScenario()).toLowerCase();
+    assert.match(scenarioText, /corporativ|confidencial|política/);
+    assert.match(scenarioText, /talento humano|tecnología|departamento/);
+    assert.match(scenarioText, /supervisor|tablero|procedimiento/);
 });
 
 test('marca la simulación completa tras las tres decisiones canónicas', () => {

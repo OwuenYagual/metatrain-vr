@@ -9,6 +9,7 @@ import {
     type SimulationScenario,
     type SimulationSelection,
 } from './simulationService';
+import './SimulationPage.css';
 
 export default function SimulationPage() {
     const [scenario, setScenario] = useState<SimulationScenario | null>(null);
@@ -69,122 +70,112 @@ export default function SimulationPage() {
         navigate('/login', { replace: true });
     };
 
-    const shellStyle = {
-        width: 'min(820px, calc(100% - 2rem))',
-        margin: '2rem auto',
-        padding: 'clamp(1.25rem, 4vw, 2.5rem)',
-        background: '#ffffff',
-        borderRadius: '16px',
-        boxShadow: '0 18px 50px rgba(15, 23, 42, 0.12)',
-        boxSizing: 'border-box' as const,
-        textAlign: 'left' as const,
-    };
-
     return (
-        <main style={{ minHeight: '100vh', width: '100%', background: '#eef2ff', padding: '1px 0', color: '#172033' }}>
-            <section style={shellStyle}>
-                <header style={{ borderBottom: '1px solid #cbd5e1', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
-                    <p style={{ color: '#475569', marginBottom: '0.35rem' }}>Módulo 1 · Simulación formativa</p>
-                    <h1 style={{ margin: 0, fontSize: 'clamp(1.8rem, 5vw, 2.5rem)' }}>
-                        {scenario?.title ?? 'Simulación de decisiones'}
-                    </h1>
-                    {session?.participant.fullName && (
-                        <p style={{ marginTop: '0.5rem' }}>Participante: {session.participant.fullName}</p>
-                    )}
-                </header>
+        <main className="simulation-page">
+            <header className="simulation-header">
+                <div>
+                    <p>Inducción · Reto de integración</p>
+                    <h1>{scenario?.title ?? 'Tu primer día en la empresa'}</h1>
+                    {session?.participant.fullName && <span>En capacitación: {session.participant.fullName}</span>}
+                </div>
+                <div className="simulation-header-actions">
+                    <button type="button" onClick={() => navigate('/training')}>Volver a la oficina</button>
+                    <button type="button" onClick={logout}>Cerrar sesión</button>
+                </div>
+            </header>
 
-                {loading && <p role="status">Cargando simulación...</p>}
-                {error && (
-                    <p role="alert" style={{ padding: '0.85rem', background: '#fef2f2', color: '#b91c1c', borderRadius: 8 }}>
-                        {error}
-                    </p>
-                )}
+            {loading && <p className="simulation-loading" role="status">Preparando tu primera jornada...</p>}
+            {error && <p className="simulation-error" role="alert">{error}</p>}
 
-                {!loading && scenario && progress && (
-                    <>
-                        <p style={{ lineHeight: 1.6 }}>{scenario.introduction}</p>
-                        <section aria-labelledby="simulation-progress-title" style={{ margin: '1.25rem 0' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                                <h2 id="simulation-progress-title" style={{ fontSize: '1rem' }}>Avance de la simulación</h2>
-                                <strong>{progress.completedCount} de {progress.requiredCount}</strong>
-                            </div>
-                            <progress value={progress.completedCount} max={progress.requiredCount} style={{ width: '100%', accentColor: '#4f46e5' }} />
-                            <p style={{ marginTop: '0.35rem', color: '#475569', fontSize: '0.9rem' }}>
-                                No tiene nota: el objetivo es practicar y revisar la retroalimentación.
-                            </p>
-                        </section>
+            {!loading && scenario && progress && (
+                <div className="simulation-workspace">
+                    <section className="first-day-map" aria-labelledby="first-day-map-title">
+                        <div>
+                            <p className="simulation-eyebrow">Recorrido del día</p>
+                            <h2 id="first-day-map-title">Tu oficina</h2>
+                            <p>{scenario.introduction}</p>
+                        </div>
+                        <div className="office-zones">
+                            {[
+                                { icon: '🔐', name: 'Políticas', time: '08:30' },
+                                { icon: '👥', name: 'Talento Humano', time: '11:00' },
+                                { icon: '📋', name: 'Operaciones', time: '15:30' },
+                            ].map((zone, index) => {
+                                const completed = index < progress.completedCount;
+                                const active = index === progress.completedCount && !progress.completed;
+                                return (
+                                    <article className={`office-zone ${completed ? 'is-completed' : ''} ${active ? 'is-active' : ''}`} key={zone.name}>
+                                        <span className="office-zone-icon" aria-hidden="true">{zone.icon}</span>
+                                        <div><small>{zone.time}</small><strong>{zone.name}</strong></div>
+                                        <span aria-hidden="true">{completed ? '✓' : active ? '→' : '○'}</span>
+                                    </article>
+                                );
+                            })}
+                        </div>
+                        <div className="simulation-progress">
+                            <div><span>Jornada completada</span><strong>{progress.completedCount} de {progress.requiredCount}</strong></div>
+                            <progress value={progress.completedCount} max={progress.requiredCount} />
+                            <small>Es una práctica formativa: cada decisión genera una consecuencia y puede revisarse.</small>
+                        </div>
+                    </section>
 
+                    <section className="decision-workbench" aria-live="polite">
                         {feedback ? (
-                            <section aria-labelledby="feedback-title" style={{ padding: '1.25rem', background: feedback.recommended ? '#dcfce7' : '#fff7ed', color: feedback.recommended ? '#166534' : '#9a3412', borderRadius: 12 }}>
-                                <h2 id="feedback-title" style={{ marginTop: 0 }}>
-                                    {feedback.recommended ? 'Decisión recomendada' : 'Revisa esta decisión'}
-                                </h2>
-                                <p role="status" style={{ lineHeight: 1.6 }}>{feedback.feedback}</p>
-                                <button type="button" onClick={() => setFeedback(null)} style={{ marginTop: '1rem', padding: '0.7rem 1rem', fontWeight: 700 }}>
-                                    {progress.completed ? 'Ver resumen' : 'Continuar'}
+                            <article className={`decision-consequence ${feedback.recommended ? 'is-positive' : 'is-warning'}`}>
+                                <p className="simulation-eyebrow">Consecuencia de tu acción</p>
+                                <div className="consequence-icon" aria-hidden="true">{feedback.recommended ? '✓' : '↻'}</div>
+                                <h2>{feedback.recommended ? 'Aplicaste la inducción' : 'Hay una opción más segura'}</h2>
+                                <p>{feedback.feedback}</p>
+                                <button type="button" onClick={() => setFeedback(null)}>
+                                    {progress.completed ? 'Ver cierre de la jornada' : 'Continuar el recorrido'}
                                 </button>
-                            </section>
+                            </article>
                         ) : progress.completed ? (
-                            <section aria-labelledby="simulation-summary-title">
-                                <h2 id="simulation-summary-title">Simulación completada</h2>
-                                <p style={{ marginBottom: '1rem' }}>Tus tres decisiones quedaron guardadas. Ya puedes iniciar la evaluación final.</p>
-                                <ol style={{ display: 'grid', gap: '0.75rem', paddingLeft: '1.25rem' }}>
-                                    {scenario.decisions.map((decision) => {
+                            <article className="simulation-summary">
+                                <p className="simulation-eyebrow">Jornada terminada</p>
+                                <h2>Completaste tu primer día</h2>
+                                <p>Aplicaste políticas, identificaste a quién pedir apoyo y practicaste las funciones de tu puesto.</p>
+                                <div className="decision-log">
+                                    {scenario.decisions.map((decision, index) => {
                                         const selection = progress.decisions.find((item) => item.decisionId === decision.id);
                                         const option = decision.options.find((item) => item.id === selection?.selectedOptionId);
                                         return (
-                                            <li key={decision.id}>
-                                                <strong>{decision.prompt}</strong>
-                                                <p style={{ marginTop: '0.25rem', color: selection?.recommended ? '#166534' : '#9a3412' }}>
-                                                    {option?.text ?? 'Sin respuesta'}
-                                                </p>
-                                            </li>
+                                            <article key={decision.id}>
+                                                <span>{index + 1}</span>
+                                                <div><strong>{decision.prompt.split('·')[0]}</strong><p>{option?.text ?? 'Sin respuesta'}</p></div>
+                                            </article>
                                         );
                                     })}
-                                </ol>
-                                <button type="button" onClick={() => navigate('/evaluation')} style={{ width: '100%', marginTop: '1.25rem', padding: '0.9rem', background: '#166534', color: '#fff', border: 0, borderRadius: 8, fontWeight: 800 }}>
-                                    Iniciar evaluación final
-                                </button>
-                            </section>
+                                </div>
+                                <button className="evaluation-button" type="button" onClick={() => navigate('/evaluation')}>Iniciar evaluación final</button>
+                            </article>
                         ) : currentDecision ? (
-                            <section aria-labelledby="decision-title" style={{ padding: '1.25rem', border: '1px solid #cbd5e1', borderRadius: 12 }}>
-                                <p style={{ color: '#4f46e5', fontWeight: 700, marginBottom: '0.5rem' }}>
-                                    Decisión {progress.completedCount + 1} de {progress.requiredCount}
-                                </p>
-                                <h2 id="decision-title" style={{ lineHeight: 1.35 }}>{currentDecision.prompt}</h2>
-                                <div style={{ display: 'grid', gap: '0.65rem', marginTop: '1rem' }}>
-                                    {currentDecision.options.map((option) => (
-                                        <label key={option.id} style={{ display: 'flex', gap: '0.65rem', padding: '0.8rem', background: selectedOptionId === option.id ? '#e0e7ff' : '#f8fafc', borderRadius: 8, cursor: 'pointer' }}>
-                                            <input
-                                                type="radio"
-                                                name={`decision-${currentDecision.id}`}
-                                                value={option.id}
-                                                checked={selectedOptionId === option.id}
-                                                onChange={() => setSelectedOptionId(option.id)}
-                                                disabled={saving}
-                                            />
-                                            <span>{option.text}</span>
-                                        </label>
+                            <article className="active-decision">
+                                <p className="simulation-eyebrow">Momento {progress.completedCount + 1} de {progress.requiredCount}</p>
+                                <h2>{currentDecision.prompt}</h2>
+                                <p>Elige una acción para ver su consecuencia en la jornada.</p>
+                                <div className="action-cards">
+                                    {currentDecision.options.map((option, index) => (
+                                        <button
+                                            type="button"
+                                            key={option.id}
+                                            className={selectedOptionId === option.id ? 'is-selected' : ''}
+                                            onClick={() => setSelectedOptionId(option.id)}
+                                            disabled={saving}
+                                        >
+                                            <span>{String.fromCharCode(65 + index)}</span>
+                                            {option.text}
+                                        </button>
                                     ))}
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => void submitDecision()}
-                                    disabled={!selectedOptionId || saving}
-                                    style={{ width: '100%', marginTop: '1rem', padding: '0.85rem', background: selectedOptionId ? '#4f46e5' : '#94a3b8', color: '#fff', border: 0, borderRadius: 8, fontWeight: 800 }}
-                                >
-                                    {saving ? 'Guardando...' : 'Confirmar decisión'}
+                                <button className="execute-action" type="button" onClick={() => void submitDecision()} disabled={!selectedOptionId || saving}>
+                                    {saving ? 'Registrando acción...' : 'Ejecutar esta acción'}
                                 </button>
-                            </section>
+                            </article>
                         ) : null}
-                    </>
-                )}
-
-                <footer style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.75rem', paddingTop: '1rem', borderTop: '1px solid #cbd5e1' }}>
-                    <button type="button" onClick={() => navigate('/training')}>Volver al recorrido</button>
-                    <button type="button" onClick={logout}>Cerrar sesión</button>
-                </footer>
-            </section>
+                    </section>
+                </div>
+            )}
         </main>
     );
 }

@@ -1,0 +1,46 @@
+.training-page {
+    position: relative;
+    isolation: isolate;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #cfe3f4;
+}
+
+.training-hud {
+    position: absolute;
+    z-index: 10;
+    top: 20px;
+    left: 20px;
+    width: min(400px, calc(100vw - 40px));
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 1rem 1.25rem;
+    border: 1px solid rgb(203 213 225 / 80%);
+    border-radius: 12px;
+    background: rgb(255 255 255 / 94%);
+    box-shadow: 0 12px 36px rgb(15 23 42 / 18%);
+    text-align: left;
+    backdrop-filter: blur(10px);
+}
+
+.training-scene-shell {
+    position: absolute;
+    z-index: 0;
+    inset: 0 0 0 420px;
+}
+
+@media (max-width: 900px) {
+    .training-hud {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+        max-height: 42vh;
+    }
+
+    .training-scene-shell {
+        inset: 0;
+        padding-top: 38vh;
+    }
+}

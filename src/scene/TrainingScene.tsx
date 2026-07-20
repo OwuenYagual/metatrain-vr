@@ -1,6 +1,6 @@
 import { Suspense, useMemo, useState } from 'react';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, useGLTF } from '@react-three/drei';
+import { Html, OrbitControls, useGLTF } from '@react-three/drei';
 import { interactionSystem } from './interactionSystem';
 import { useTrainingStore } from '../store/useTrainingStore';
 import { PerformanceMonitor } from './performanceMonitor';
@@ -12,8 +12,13 @@ import {
 import { progressService } from '../progress/progressService';
 import { APP_CONFIG } from '../config/appConfig';
 import { getErrorMessage } from '../api/apiClient';
-
-type StationVariant = 'manual' | 'folder' | 'board' | 'shield' | 'terminal';
+import {
+    CorporateOffice,
+    OfficeStationModel,
+    type StationVariant,
+} from './OfficeEnvironment';
+import { OFFICE_MODEL_PATH_LIST } from './officeAssets';
+import './TrainingScene.css';
 
 type InteractiveProps = {
     position: readonly [number, number, number];
@@ -33,45 +38,6 @@ type CheckpointProps = {
     onSaved: (message: string) => void;
     onError: (message: string) => void;
 };
-
-function OfficeRoom() {
-    const { scene } = useGLTF('/models/room.glb');
-    const room = useMemo(() => scene.clone(true), [scene]);
-    return <primitive object={room} position={[0, -1.5, 0]} scale={2} />;
-}
-
-function ManualModel() {
-    const { scene } = useGLTF('/models/manual.glb');
-    const manual = useMemo(() => scene.clone(true), [scene]);
-    return <primitive object={manual} scale={0.8} />;
-}
-
-function StationVisual({ variant, completed }: { variant: StationVariant; completed: boolean }) {
-    if (variant === 'manual') return <ManualModel />;
-
-    const colors: Record<Exclude<StationVariant, 'manual'>, string> = {
-        folder: '#eab308',
-        board: '#0f766e',
-        shield: '#2563eb',
-        terminal: '#334155',
-    };
-
-    return (
-        <mesh castShadow>
-            {variant === 'terminal' ? <boxGeometry args={[0.9, 0.65, 0.25]} /> : null}
-            {variant === 'folder' ? <boxGeometry args={[0.8, 0.55, 0.18]} /> : null}
-            {variant === 'board' ? <boxGeometry args={[1.1, 0.65, 0.12]} /> : null}
-            {variant === 'shield' ? <cylinderGeometry args={[0.45, 0.55, 0.18, 6]} /> : null}
-            <meshStandardMaterial
-                color={completed ? '#16a34a' : colors[variant]}
-                emissive={completed ? '#14532d' : '#000000'}
-                emissiveIntensity={completed ? 0.35 : 0}
-                roughness={0.55}
-                metalness={0.1}
-            />
-        </mesh>
-    );
-}
 
 function CompletedMarker() {
     return (
@@ -94,8 +60,7 @@ function StationTrigger({ position, id, title, variant }: InteractiveProps) {
     const linkedContent = contents.find((content) => content.interactionObjectId === id);
     const completed = linkedContent ? completedContentIds.includes(linkedContent._id) : false;
 
-    const handleClick = (event: ThreeEvent<MouseEvent>) => {
-        event.stopPropagation();
+    const openStation = () => {
         void interactionSystem.registerInteraction(id, 'click').catch((error: unknown) => {
             console.error('No se pudo registrar la interacción:', error);
         });
@@ -109,6 +74,11 @@ function StationTrigger({ position, id, title, variant }: InteractiveProps) {
         void interactionSystem.registerInteraction(id, 'content_opened').catch((error: unknown) => {
             console.error('No se pudo registrar la apertura del contenido:', error);
         });
+    };
+
+    const handleClick = (event: ThreeEvent<MouseEvent>) => {
+        event.stopPropagation();
+        openStation();
     };
 
     return (
@@ -126,8 +96,23 @@ function StationTrigger({ position, id, title, variant }: InteractiveProps) {
                 document.body.style.cursor = 'auto';
             }}
         >
-            <StationVisual variant={variant} completed={completed} />
+            <OfficeStationModel variant={variant} />
             {completed && <CompletedMarker />}
+            <Html position={[0, 1.85, 0]} center distanceFactor={7} style={{ pointerEvents: 'auto' }}>
+                <button
+                    type="button"
+                    className={`station-label ${hovered ? 'is-hovered' : ''} ${completed ? 'is-completed' : ''}`}
+                    data-station-id={id}
+                    aria-label={`Iniciar ${title}`}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        openStation();
+                    }}
+                >
+                    <span>{completed ? '✓ Superada' : 'Actividad'}</span>
+                    <strong>{title}</strong>
+                </button>
+            </Html>
         </group>
     );
 }
@@ -142,8 +127,7 @@ function CheckpointTrigger({ checkpoint, index, onSaved, onError }: CheckpointPr
     const locked = !visited && !available;
     const markerColor = visited ? '#22c55e' : available ? '#2563eb' : '#64748b';
 
-    const handleClick = async (event: ThreeEvent<MouseEvent>) => {
-        event.stopPropagation();
+    const saveCheckpoint = async () => {
         if (saving) return;
         if (visited) {
             onSaved(`El checkpoint “${checkpoint.label}” ya está registrado.`);
@@ -171,6 +155,11 @@ function CheckpointTrigger({ checkpoint, index, onSaved, onError }: CheckpointPr
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleClick = async (event: ThreeEvent<MouseEvent>) => {
+        event.stopPropagation();
+        await saveCheckpoint();
     };
 
     return (
@@ -208,6 +197,22 @@ function CheckpointTrigger({ checkpoint, index, onSaved, onError }: CheckpointPr
                     opacity={locked ? 0.45 : 1}
                 />
             </mesh>
+            {(available || visited) && (
+                <Html position={[0, 1.05, 0]} center distanceFactor={8} style={{ pointerEvents: 'auto' }}>
+                    <button
+                        type="button"
+                        className={`checkpoint-label ${visited ? 'is-visited' : ''}`}
+                        data-checkpoint-id={checkpoint.id}
+                        aria-label={`${visited ? 'Recorrido visitado' : 'Registrar recorrido'}: ${checkpoint.label}`}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            void saveCheckpoint();
+                        }}
+                    >
+                        {visited ? '✓' : `${index + 1}`} · {checkpoint.label}
+                    </button>
+                </Html>
+            )}
         </group>
     );
 }
@@ -242,15 +247,15 @@ export default function TrainingScene({ onCheckpointSaved, onCheckpointError }: 
                     Modo rendimiento activado
                 </p>
             )}
-            <Canvas camera={{ position: [0, 4, 6], fov: 50 }} dpr={lowPerformanceMode ? 1 : [1, 1.5]}>
-                <color attach="background" args={['#dbeafe']} />
+            <Canvas shadows={!lowPerformanceMode} camera={{ position: [0, 6.1, 11.5], fov: 50 }} dpr={lowPerformanceMode ? 1 : [1, 1.5]}>
+                <color attach="background" args={['#cfe3f4']} />
                 <ambientLight intensity={lowPerformanceMode ? 0.9 : 0.65} />
                 {!lowPerformanceMode && <directionalLight position={[4, 8, 4]} intensity={1.2} castShadow />}
-                <OrbitControls makeDefault maxPolarAngle={Math.PI / 2 - 0.05} minDistance={2} maxDistance={12} />
+                <OrbitControls makeDefault target={[0, 0.55, 0]} maxPolarAngle={Math.PI / 2 - 0.05} minDistance={4} maxDistance={17} />
                 <PerformanceMonitor onLowPerformance={() => setLowPerformanceMode(true)} />
 
                 <Suspense fallback={null}>
-                    <OfficeRoom />
+                    <CorporateOffice />
                     {TRAINING_STATIONS.map((station) => <StationTrigger key={station.id} {...station} />)}
                     {TRAINING_CHECKPOINTS.map((checkpoint, index) => (
                         <CheckpointTrigger
@@ -267,5 +272,4 @@ export default function TrainingScene({ onCheckpointSaved, onCheckpointError }: 
     );
 }
 
-useGLTF.preload('/models/room.glb');
-useGLTF.preload('/models/manual.glb');
+OFFICE_MODEL_PATH_LIST.forEach((path) => useGLTF.preload(path));

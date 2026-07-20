@@ -3,18 +3,18 @@ export const TRAINING_MODULE_TITLE = 'Inducción Corporativa';
 export const MIN_PASSING_SCORE = 70;
 
 export const TRAINING_STATIONS = [
-    { position: [-2.5, -0.5, -1], id: 'obj_manual', title: 'Políticas de la Empresa', variant: 'manual' },
-    { position: [2.5, -0.5, -1.5], id: 'obj_rrhh', title: 'Recursos Humanos', variant: 'folder' },
-    { position: [-1.5, -0.5, 2], id: 'obj_funciones', title: 'Funciones de tu Rol', variant: 'board' },
-    { position: [0, -0.5, -2.7], id: 'obj_seguridad', title: 'Seguridad Laboral', variant: 'shield' },
-    { position: [1.5, -0.5, 2.5], id: 'obj_examen', title: 'Evaluación Final', variant: 'terminal' },
+    { position: [-3.25, -0.45, -1.25], id: 'obj_manual', title: 'Políticas y convivencia', variant: 'manual' },
+    { position: [3.25, -0.45, -1.25], id: 'obj_rrhh', title: 'Departamentos y personas', variant: 'folder' },
+    { position: [-3.1, -0.45, 2.25], id: 'obj_funciones', title: 'Funciones de tu puesto', variant: 'board' },
+    { position: [0, -0.45, -3.1], id: 'obj_seguridad', title: 'Red de apoyo', variant: 'shield' },
+    { position: [3.1, -0.45, 2.25], id: 'obj_examen', title: 'Reto del primer día', variant: 'terminal' },
 ] as const;
 
 export const TRAINING_CHECKPOINTS = [
-    { id: 'cp_entrada', label: 'Inicio del recorrido', position: [0, 0.6, -3.2] },
-    { id: 'cp_politicas', label: 'Zona de políticas', position: [2.2, 0.4, -2] },
-    { id: 'cp_seguridad', label: 'Zona de seguridad', position: [-0.7, 1.1, -0.6] },
-    { id: 'cp_cierre', label: 'Cierre del recorrido', position: [0.8, 2, 0.6] },
+    { id: 'cp_entrada', label: 'Recepción y bienvenida', position: [0, -0.48, 4] },
+    { id: 'cp_politicas', label: 'Zona de políticas', position: [-1.8, -0.48, 0.2] },
+    { id: 'cp_seguridad', label: 'Mapa de la empresa', position: [1.8, -0.48, -0.4] },
+    { id: 'cp_cierre', label: 'Puesto de trabajo', position: [0.4, -0.48, 2.55] },
 ] as const;
 
 export const TRAINING_INTERACTION_OBJECT_IDS = TRAINING_STATIONS.map((station) => station.id);
