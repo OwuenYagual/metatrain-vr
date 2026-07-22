@@ -13,7 +13,6 @@ import {
 } from '../domain/evaluation';
 import { readRequiredString } from '../utils/validation';
 import {
-    getModuleCheckpointIds,
     getModuleInteractionObjectIds,
     MIN_PASSING_SCORE,
 } from '../../shared/trainingModule';
@@ -42,7 +41,7 @@ async function readModuleId(req: Request, res: Response): Promise<string | null>
         res.status(400).json({ error: validation.error });
         return null;
     }
-    if (!getModuleInteractionObjectIds(validation.value) || !getModuleCheckpointIds(validation.value)) {
+    if (!getModuleInteractionObjectIds(validation.value)) {
         res.status(404).json({ error: 'La evaluación no está disponible para este módulo.' });
         return null;
     }
@@ -55,7 +54,6 @@ async function getEligibleProgress(
     res: Response,
 ): Promise<ITrainingProgress | null> {
     const interactionObjectIds = getModuleInteractionObjectIds(moduleId)!;
-    const checkpointIds = getModuleCheckpointIds(moduleId)!;
     const requiredContents = await TrainingContent.find({
         moduleId,
         active: true,
@@ -73,8 +71,6 @@ async function getEligibleProgress(
     const requirements = summarizeEvaluationRequirements({
         requiredContentIds: requiredContents.map((content) => String(content._id)),
         completedContentIds: progress?.completedContents ?? [],
-        requiredCheckpointIds: checkpointIds,
-        visitedCheckpointIds: progress?.visitedCheckpoints ?? [],
         requiredSimulationDecisionIds,
         completedSimulationDecisionIds: progress
             ? getCompletedSimulationDecisionIds(progress.simulationDecisions)
@@ -84,7 +80,7 @@ async function getEligibleProgress(
 
     if (!progress || !requirements.eligible) {
         res.status(409).json({
-            error: 'Completa los cinco contenidos, los cuatro checkpoints y la simulación antes de iniciar la evaluación.',
+            error: 'Completa las cinco actividades y la simulación antes de iniciar la evaluación.',
             requirements,
         });
         return null;

@@ -7,9 +7,8 @@ import { authenticate, canAccessParticipant } from '../middleware/auth.middlewar
 import { validateInteractionInput, validateProgressItemInput } from '../domain/progress';
 import { readRequiredString } from '../utils/validation';
 import {
-    getModuleCheckpointIds,
     getModuleInteractionObjectIds,
-    getNextTrainingCheckpointId,
+    getPreviousTrainingStationId,
 } from '../../shared/trainingModule';
 import { getCompletedSimulationDecisionIds, SIMULATION_DECISION_IDS } from '../domain/simulation';
 
@@ -23,7 +22,6 @@ function progressSummary(progress: ITrainingProgress) {
     return {
         participantId: progress.participantId,
         moduleId: progress.moduleId,
-        visitedCheckpoints: progress.visitedCheckpoints,
         completedContents: progress.completedContents,
         interactionCount: progress.interactions.length,
         simulationDecisionCount: progress.simulationDecisions.length,
@@ -108,45 +106,6 @@ router.post('/interaction', async (req: Request, res: Response): Promise<void> =
     }
 });
 
-router.post('/checkpoint', async (req: Request, res: Response): Promise<void> => {
-    try {
-        const validation = validateProgressItemInput(req.body, 'checkpointId');
-        if (!validation.ok) {
-            res.status(400).json({ error: validation.error });
-            return;
-        }
-
-        const checkpointIds = getModuleCheckpointIds(validation.value.moduleId);
-        if (checkpointIds && !checkpointIds.includes(validation.value.itemId)) {
-            res.status(400).json({ error: 'El checkpoint no pertenece al recorrido activo.' });
-            return;
-        }
-
-        const progress = await getEditableProgress(req.auth!.id, validation.value.moduleId);
-        const alreadyVisited = progress.visitedCheckpoints.includes(validation.value.itemId);
-        if (
-            checkpointIds
-            && !alreadyVisited
-            && getNextTrainingCheckpointId(progress.visitedCheckpoints) !== validation.value.itemId
-        ) {
-            res.status(409).json({ error: 'Debe visitar los checkpoints en el orden definido.' });
-            return;
-        }
-        if (!alreadyVisited) {
-            progress.visitedCheckpoints.push(validation.value.itemId);
-        }
-        await progress.save();
-        res.status(200).json({ progress: progressSummary(progress) });
-    } catch (error: unknown) {
-        if (error instanceof Error && error.message === 'PROGRESS_FINALIZED') {
-            res.status(409).json({ error: 'El progreso del módulo ya está finalizado.' });
-            return;
-        }
-        console.error('Error guardando checkpoint:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
-});
-
 router.post('/content', async (req: Request, res: Response): Promise<void> => {
     try {
         const validation = validateProgressItemInput(req.body, 'contentId');
@@ -160,19 +119,34 @@ router.post('/content', async (req: Request, res: Response): Promise<void> => {
             return;
         }
         const interactionObjectIds = getModuleInteractionObjectIds(validation.value.moduleId);
-        const contentExists = await TrainingContent.exists({
+        const content = await TrainingContent.findOne({
             _id: validation.value.itemId,
             moduleId: validation.value.moduleId,
             active: true,
             ...(interactionObjectIds ? { interactionObjectId: { $in: interactionObjectIds } } : {}),
-        });
-        if (!contentExists) {
+        }).select('_id interactionObjectId');
+        if (!content) {
             res.status(404).json({ error: 'El contenido no pertenece al recorrido activo.' });
             return;
         }
 
         const progress = await getEditableProgress(req.auth!.id, validation.value.moduleId);
-        if (!progress.completedContents.includes(validation.value.itemId)) {
+        const alreadyCompleted = progress.completedContents.includes(validation.value.itemId);
+        if (!alreadyCompleted) {
+            const previousStationId = getPreviousTrainingStationId(content.interactionObjectId);
+            if (previousStationId) {
+                const previousContent = await TrainingContent.findOne({
+                    moduleId: validation.value.moduleId,
+                    interactionObjectId: previousStationId,
+                    active: true,
+                }).select('_id');
+                if (!previousContent || !progress.completedContents.includes(String(previousContent._id))) {
+                    res.status(409).json({
+                        error: 'Completa la estación anterior antes de guardar esta capacitación.',
+                    });
+                    return;
+                }
+            }
             progress.completedContents.push(validation.value.itemId);
         }
         await progress.save();

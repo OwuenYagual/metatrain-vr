@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateContentProgress, calculateProgress } from '../src/progress/contentProgress';
+import { calculateContentProgress, getCompletedStationIds } from '../src/progress/contentProgress';
 import {
-    getNextTrainingCheckpointId,
-    TRAINING_CHECKPOINT_IDS,
-    TRAINING_CHECKPOINTS,
+    getCompletedTrainingRouteSegmentCount,
+    getPreviousTrainingStationId,
+    isTrainingStationUnlocked,
     TRAINING_INTERACTION_OBJECT_IDS,
     TRAINING_STATIONS,
 } from '../shared/trainingModule';
@@ -14,23 +14,42 @@ test('el recorrido publicado contiene exactamente cinco objetos interactivos ún
     assert.equal(new Set(TRAINING_INTERACTION_OBJECT_IDS).size, 5);
 });
 
-test('el recorrido contiene exactamente cuatro checkpoints únicos', () => {
-    assert.equal(TRAINING_CHECKPOINTS.length, 4);
-    assert.equal(new Set(TRAINING_CHECKPOINT_IDS).size, 4);
+test('la ruta conserva el orden pedagógico de las cinco estaciones', () => {
+    assert.deepEqual(TRAINING_INTERACTION_OBJECT_IDS, [
+        'obj_manual',
+        'obj_rrhh',
+        'obj_funciones',
+        'obj_seguridad',
+        'obj_examen',
+    ]);
+    assert.equal(TRAINING_STATIONS.every(({ position }) => position[1] === -0.45), true);
 });
 
-test('calcula checkpoints visitados sin contar IDs desconocidos', () => {
-    assert.deepEqual(calculateProgress(TRAINING_CHECKPOINT_IDS, ['cp_entrada', 'cp_fuera']), {
-        completedCount: 1,
-        totalCount: 4,
-        percentage: 25,
-    });
+test('cada estación cuenta con un NPC capacitador identificado', () => {
+    assert.equal(TRAINING_STATIONS.every(({ guide }) => (
+        guide.name.length > 0
+        && guide.role.length > 0
+        && /^#[0-9a-f]{6}$/i.test(guide.color)
+    )), true);
+    assert.equal(new Set(TRAINING_STATIONS.map(({ guide }) => guide.name)).size, TRAINING_STATIONS.length);
 });
 
-test('determina el siguiente checkpoint pendiente en el orden del recorrido', () => {
-    assert.equal(getNextTrainingCheckpointId([]), 'cp_entrada');
-    assert.equal(getNextTrainingCheckpointId(['cp_entrada', 'cp_politicas']), 'cp_seguridad');
-    assert.equal(getNextTrainingCheckpointId(TRAINING_CHECKPOINT_IDS), null);
+test('habilita las estaciones una por una según el orden del recorrido', () => {
+    assert.equal(isTrainingStationUnlocked('obj_manual', []), true);
+    assert.equal(isTrainingStationUnlocked('obj_rrhh', []), false);
+    assert.equal(isTrainingStationUnlocked('obj_rrhh', ['obj_manual']), true);
+    assert.equal(isTrainingStationUnlocked('obj_funciones', ['obj_manual']), false);
+    assert.equal(isTrainingStationUnlocked('obj_desconocido', TRAINING_INTERACTION_OBJECT_IDS), false);
+    assert.equal(getPreviousTrainingStationId('obj_manual'), null);
+    assert.equal(getPreviousTrainingStationId('obj_funciones'), 'obj_rrhh');
+});
+
+test('pinta únicamente los tramos consecutivos ya recorridos', () => {
+    assert.equal(getCompletedTrainingRouteSegmentCount([]), 0);
+    assert.equal(getCompletedTrainingRouteSegmentCount(['obj_manual']), 1);
+    assert.equal(getCompletedTrainingRouteSegmentCount(['obj_manual', 'obj_rrhh']), 2);
+    assert.equal(getCompletedTrainingRouteSegmentCount(['obj_funciones']), 0);
+    assert.equal(getCompletedTrainingRouteSegmentCount(TRAINING_INTERACTION_OBJECT_IDS), 4);
 });
 
 test('calcula el avance usando únicamente contenidos disponibles y sin duplicados', () => {
@@ -52,4 +71,12 @@ test('representa como cero un módulo que todavía no tiene contenidos', () => {
         totalCount: 0,
         percentage: 0,
     });
+});
+
+test('traduce el progreso guardado a estaciones completadas', () => {
+    const contents = [
+        { _id: 'c1', interactionObjectId: 'obj_manual' },
+        { _id: 'c2', interactionObjectId: 'obj_rrhh' },
+    ];
+    assert.deepEqual(getCompletedStationIds(contents, ['c1', 'contenido_antiguo']), ['obj_manual']);
 });

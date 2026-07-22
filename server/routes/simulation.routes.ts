@@ -16,7 +16,6 @@ import {
     validateSimulationDecisionInput,
 } from '../domain/simulation';
 import {
-    getModuleCheckpointIds,
     getModuleInteractionObjectIds,
     TRAINING_MODULE_ID,
 } from '../../shared/trainingModule';
@@ -41,7 +40,6 @@ function readSupportedModuleId(req: Request, res: Response): string | null {
 
 async function getGuidedRouteProgress(participantId: string, moduleId: string, res: Response) {
     const interactionObjectIds = getModuleInteractionObjectIds(moduleId)!;
-    const checkpointIds = getModuleCheckpointIds(moduleId)!;
     const contents = await TrainingContent.find({
         moduleId,
         active: true,
@@ -54,16 +52,13 @@ async function getGuidedRouteProgress(participantId: string, moduleId: string, r
 
     const progress = await TrainingProgress.findOne({ participantId, moduleId });
     const completedContents = new Set(progress?.completedContents ?? []);
-    const visitedCheckpoints = new Set(progress?.visitedCheckpoints ?? []);
     const requiredContentIds = contents.map((content) => String(content._id));
     const contentsCompleted = requiredContentIds.filter((contentId) => completedContents.has(contentId)).length;
-    const checkpointsCompleted = checkpointIds.filter((checkpointId) => visitedCheckpoints.has(checkpointId)).length;
-    if (!progress || contentsCompleted !== requiredContentIds.length || checkpointsCompleted !== checkpointIds.length) {
+    if (!progress || contentsCompleted !== requiredContentIds.length) {
         res.status(409).json({
-            error: 'Completa los cinco contenidos y los cuatro checkpoints antes de iniciar la simulación.',
+            error: 'Completa las cinco actividades antes de iniciar la simulación.',
             requirements: {
                 contents: { completed: contentsCompleted, required: requiredContentIds.length },
-                checkpoints: { completed: checkpointsCompleted, required: checkpointIds.length },
             },
         });
         return null;

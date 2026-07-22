@@ -25,8 +25,6 @@ export type EvaluationScore = {
 export type EvaluationRequirements = {
     requiredContentIds: readonly string[];
     completedContentIds: readonly string[];
-    requiredCheckpointIds: readonly string[];
-    visitedCheckpointIds: readonly string[];
     requiredSimulationDecisionIds?: readonly string[];
     completedSimulationDecisionIds?: readonly string[];
     simulationGrandfathered?: boolean;
@@ -105,11 +103,9 @@ export function calculateEvaluationScore(
 
 export function summarizeEvaluationRequirements(requirements: EvaluationRequirements) {
     const completedContentIds = new Set(requirements.completedContentIds);
-    const visitedCheckpointIds = new Set(requirements.visitedCheckpointIds);
     const requiredSimulationDecisionIds = requirements.requiredSimulationDecisionIds ?? [];
     const completedSimulationDecisionIds = new Set(requirements.completedSimulationDecisionIds ?? []);
     const completedContents = requirements.requiredContentIds.filter((id) => completedContentIds.has(id)).length;
-    const visitedCheckpoints = requirements.requiredCheckpointIds.filter((id) => visitedCheckpointIds.has(id)).length;
     const completedSimulationDecisions = requiredSimulationDecisionIds
         .filter((id) => completedSimulationDecisionIds.has(id)).length;
 
@@ -118,17 +114,12 @@ export function summarizeEvaluationRequirements(requirements: EvaluationRequirem
             completed: completedContents,
             required: requirements.requiredContentIds.length,
         },
-        checkpoints: {
-            completed: visitedCheckpoints,
-            required: requirements.requiredCheckpointIds.length,
-        },
         simulation: {
             completed: completedSimulationDecisions,
             required: requiredSimulationDecisionIds.length,
             grandfathered: requirements.simulationGrandfathered ?? false,
         },
         eligible: completedContents === requirements.requiredContentIds.length
-            && visitedCheckpoints === requirements.requiredCheckpointIds.length
             && completedSimulationDecisions === requiredSimulationDecisionIds.length,
     };
 }

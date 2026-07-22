@@ -9,7 +9,7 @@ test('acepta únicamente eventos de interacción definidos por el contrato', () 
     assert.equal(invalid.ok, false);
 });
 
-test('valida checkpoint y contenido con módulo dinámico', () => {
-    assert.equal(validateProgressItemInput({ moduleId: 'induccion_001', checkpointId: 'cp_01' }, 'checkpointId').ok, true);
+test('valida el contenido con un módulo dinámico', () => {
+    assert.equal(validateProgressItemInput({ moduleId: 'induccion_001', contentId: 'ct_01' }, 'contentId').ok, true);
     assert.equal(validateProgressItemInput({ moduleId: '', contentId: 'ct_01' }, 'contentId').ok, false);
 });

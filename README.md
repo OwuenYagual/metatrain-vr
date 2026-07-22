@@ -13,12 +13,16 @@ Este estado del proyecto incluye:
 - Registro e inicio de sesión con JWT.
 - Tres avatares GLB predefinidos con previsualización 3D.
 - Selección persistente de avatar.
-- Escenario de capacitación 3D con cinco estaciones interactivas.
+- Escenario de inducción 3D con cinco estaciones interactivas sobre políticas, departamentos, personas y funciones del puesto.
+- Cinco NPC capacitadores integrados al escenario; cada uno explica el tema mediante globos de texto secuenciales antes de habilitar la actividad práctica.
+- Navegación y progreso accesibles desde un menú hamburguesa que deja libre la vista del entorno 3D.
+- Oficina corporativa modular con mobiliario 3D low-poly alojado localmente.
 - Contenidos asociados mediante `interactionObjectId` estable.
+- Actividades de decisiones, exploración del organigrama, secuenciación de tareas y selección de responsabilidades; no se completa una estación leyendo un cuadro de diálogo.
 - Registro y recuperación de progreso por módulo.
 - Evaluación final de cinco preguntas, calificación segura y reintentos cuando no se alcanza el 70 %.
 - Emisión y descarga de un certificado PDF verificable para participantes aprobados.
-- Simulación formativa de tres decisiones con retroalimentación inmediata y avance persistente.
+- Reto de integración que simula tres momentos del primer día laboral con consecuencias y avance persistente.
 - Cola offline para reintentar eventos cuando vuelve la conexión.
 - Modo de bajo rendimiento al detectar FPS críticos.
 - Validación de modelos y pruebas unitarias básicas.
@@ -31,6 +35,10 @@ Este estado del proyecto incluye:
 - Resolución recomendada: 1280x720 o superior.
 
 Los avatares de demostración se cargan desde los ejemplos públicos oficiales de Three.js. Antes de un despliegue productivo conviene copiarlos a `public/assets/avatars` y revisar su licencia específica.
+
+El entorno corporativo usa una selección local del [Furniture Kit de Kenney](https://kenney.nl/assets/furniture-kit), publicado bajo licencia [Creative Commons CC0](https://creativecommons.org/publicdomain/zero/1.0/). La licencia y la procedencia también están documentadas en `public/models/office/LICENSE-KENNEY.txt`.
+
+Los nombres de personas y el puesto “Analista de Operaciones” usados en la inducción son datos demostrativos. Deben sustituirse por la estructura y el personal autorizados de la empresa antes de publicar el módulo.
 
 ## 4. Instalación
 
@@ -96,6 +104,7 @@ src/
   content/      Acceso a contenidos
   certificate/ Emisión y descarga de certificados
   evaluation/   Preguntas, entrega y recuperación de resultados
+  induction/    Actividades interactivas de políticas, organigrama y funciones
   progress/     Recuperación de progreso
   scene/        Escenario, interacción y monitor de FPS
   simulation/   Simulación formativa y recuperación de decisiones
@@ -125,7 +134,6 @@ tests/          Pruebas unitarias
 | `GET` | `/api/training/:moduleId/contents` | Sí | Obtener contenidos activos. |
 | `GET` | `/api/progress/:participantId?moduleId=...` | Sí | Recuperar progreso propio. |
 | `POST` | `/api/progress/interaction` | Sí | Registrar una interacción. |
-| `POST` | `/api/progress/checkpoint` | Sí | Registrar un checkpoint. |
 | `POST` | `/api/progress/content` | Sí | Marcar contenido como completado. |
 | `GET` | `/api/simulation/:moduleId` | Sí | Recuperar escenario y decisiones guardadas. |
 | `POST` | `/api/simulation/:moduleId/decisions` | Sí | Validar y guardar una decisión en orden. |
@@ -145,18 +153,21 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 2. El frontend consulta su progreso guardado.
 3. Si no hay progreso en curso, muestra los tres avatares 3D.
 4. El participante confirma un avatar y entra al módulo.
-5. El escenario carga cinco estaciones livianas y cuatro checkpoints ordenados.
-6. El participante visita los checkpoints con el puntero; solo el siguiente punto del recorrido está habilitado.
-7. Cada interacción se guarda inmediatamente o queda en la cola offline.
-8. Al pulsar “Comprendido”, el contenido se marca como completado.
-9. El panel actualiza los dos avances y la escena distingue checkpoints y contenidos completados.
-10. Al completar los cinco contenidos y los cuatro checkpoints, se habilita la simulación formativa.
-11. El participante completa tres decisiones secuenciales y recibe retroalimentación inmediata; la simulación no tiene nota.
-12. Al completar la simulación se habilita la evaluación final.
-13. El servidor valida todas las respuestas, calcula la nota y aprueba desde 70 %.
-14. Un resultado no aprobado puede reintentarse; una aprobación queda cerrada y se recupera al volver a iniciar sesión.
-15. El participante aprobado puede emitir y descargar un único certificado PDF con código de verificación.
-16. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
+5. El escenario compone una oficina low-poly con cinco estaciones conectadas por una ruta entrecortada; los tramos pendientes son grises y se pintan de verde al avanzar.
+6. La primera estación comienza habilitada; cada estación posterior se desbloquea únicamente al completar y guardar la anterior.
+7. El participante sigue la ruta visual e interactúa con el NPC capacitador asignado a la estación disponible.
+8. Al abrir una estación, la cámara se acerca suavemente al NPC; al cerrar el panel regresa a la vista general.
+9. El guía presenta la información en tres bloques formativos mediante globos anclados al NPC dentro de la escena 3D, con escritura progresiva y pausas breves; solo entonces habilita la actividad práctica.
+10. En la práctica, el participante aplica políticas, explora departamentos y personas, organiza las funciones del puesto, selecciona canales de apoyo o construye su tarjeta de responsabilidades.
+11. La estación se marca como completada únicamente después de superar su actividad y guardar el resultado.
+12. Cada interacción se guarda inmediatamente o queda en la cola offline; la escena distingue las estaciones completadas.
+13. Al completar las cinco actividades se habilita el reto de integración.
+14. El participante recorre tres momentos de su primer día, decide una acción y observa su consecuencia; el reto no tiene nota.
+15. Al completar la simulación se habilita la evaluación final.
+16. El servidor valida todas las respuestas, calcula la nota y aprueba desde 70 %.
+17. Un resultado no aprobado puede reintentarse; una aprobación queda cerrada y se recupera al volver a iniciar sesión.
+18. El participante aprobado puede emitir y descargar un único certificado PDF con código de verificación.
+19. Si los FPS permanecen por debajo del umbral crítico, se reduce la calidad de render.
 
 ## 11. Criterios de aceptación
 
@@ -168,10 +179,20 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 - El escenario no solicita modelos locales inexistentes.
 - Los contenidos se enlazan por `interactionObjectId`, no por título.
 - El recorrido y el progreso contienen exactamente las cinco estaciones publicadas; los registros antiguos no vinculados quedan fuera.
-- El recorrido contiene cuatro checkpoints únicos, se visitan en orden y el backend rechaza IDs ajenos al módulo.
-- El avance guardado muestra contenidos revisados, porcentaje y marcadores 3D después de iniciar una nueva sesión.
+- Una ruta entrecortada conecta las cinco estaciones en el orden pedagógico de la inducción.
+- La ruta conserva en gris los tramos pendientes y cambia a verde solamente los segmentos consecutivos completados.
+- La cámara enfoca la estación activa mediante una transición, conserva visibles al NPC y el escenario temático, y recupera el encuadre general al cerrarla.
+- Cada estación presenta un NPC identificable por nombre y rol, con al menos tres bloques de capacitación antes de mostrar su actividad.
+- Los mensajes del NPC aparecen sobre el personaje dentro de la escena 3D, en globos consecutivos con escritura progresiva, velocidad lenta/normal/rápida persistente, una pausa legible y una opción para mostrar el diálogo completo.
+- El acceso al progreso y a la lista de estaciones se mantiene contraído en un menú hamburguesa y se cierra al abrir una estación.
+- Solo la siguiente estación pendiente muestra el mensaje “Habla con [nombre] sobre [capacitación]”; las futuras permanecen bloqueadas y el servidor impide completarlas fuera de orden.
+- El avance guardado muestra actividades superadas, porcentaje y marcadores 3D después de iniciar una nueva sesión.
+- Cada objeto abre una actividad contextual junto a la escena y no un modal de lectura con un botón “Comprendido”.
+- Una respuesta práctica correcta se resalta en verde; los controles de continuación y guardado reciben foco al aparecer, y la pregunta siguiente recupera el foco al avanzar.
+- El organigrama presenta al menos cuatro departamentos, una persona de referencia y un canal de contacto por área.
+- Las actividades cubren confidencialidad y convivencia, departamentos y personal, y las funciones del Analista de Operaciones.
 - La evaluación no entrega `correctOptionId` al frontend y rechaza preguntas, opciones o respuestas duplicadas inválidas.
-- La evaluación permanece bloqueada hasta completar exactamente los cinco contenidos y cuatro checkpoints vigentes.
+- La evaluación permanece bloqueada hasta completar las cinco actividades vigentes.
 - La evaluación también exige completar las tres decisiones de la simulación; los resultados emitidos antes de este cambio conservan compatibilidad.
 - Las decisiones se guardan en orden y los datos ajenos al escenario activo no cuentan para completarlo.
 - La nota y el estado se recuperan después de cerrar e iniciar sesión.
@@ -188,4 +209,3 @@ Las rutas protegidas requieren `Authorization: Bearer <token>`. La identidad sie
 - Los tres GLB de avatar se sirven temporalmente desde Three.js; producción debería alojarlos localmente.
 - El rate limit usa memoria del proceso; una instalación con varias réplicas requerirá Redis u otro almacenamiento compartido.
 - La cola offline conserva como máximo 250 solicitudes y no sustituye una estrategia de sincronización distribuida.
-- El dashboard administrativo permanece como entregable posterior de la propuesta técnica.
