@@ -4,7 +4,7 @@ export type ContentProgressSummary = {
     percentage: number;
 };
 
-export function calculateProgress(
+export function calculateContentProgress(
     availableItemIds: readonly string[],
     completedItemIds: readonly string[],
 ): ContentProgressSummary {
@@ -22,4 +22,12 @@ export function calculateProgress(
     };
 }
 
-export const calculateContentProgress = calculateProgress;
+export function getCompletedStationIds(
+    contents: readonly { _id: string; interactionObjectId: string }[],
+    completedContentIds: readonly string[],
+): string[] {
+    const completedIds = new Set(completedContentIds);
+    return contents
+        .filter((content) => completedIds.has(content._id))
+        .map((content) => content.interactionObjectId);
+}

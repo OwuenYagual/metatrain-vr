@@ -33,7 +33,7 @@ export function validateInteractionInput(body: unknown): ValidationResult<Intera
 
 export function validateProgressItemInput(
     body: unknown,
-    fieldName: 'checkpointId' | 'contentId'
+    fieldName: 'contentId'
 ): ValidationResult<{ moduleId: string; itemId: string }> {
     if (!body || typeof body !== 'object') return { ok: false, error: 'Datos de progreso inválidos.' };
     const input = body as Record<string, unknown>;

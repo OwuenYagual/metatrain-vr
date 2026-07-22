@@ -20,7 +20,8 @@ export interface ISimulationDecision {
 export interface ITrainingProgress extends Document {
     participantId: mongoose.Types.ObjectId;
     moduleId: string;
-    visitedCheckpoints: string[];
+    // Campo legado conservado para leer progresos creados antes de eliminar los checkpoints.
+    visitedCheckpoints?: string[];
     completedContents: string[];
     interactions: IInteractionEvent[];
     simulationDecisions: ISimulationDecision[];
@@ -50,7 +51,7 @@ const SimulationDecisionSchema = new Schema<ISimulationDecision>({
 const TrainingProgressSchema = new Schema<ITrainingProgress>({
     participantId: { type: Schema.Types.ObjectId, ref: 'Participant', required: true },
     moduleId: { type: String, required: true },
-    visitedCheckpoints: [{ type: String, maxlength: 100 }],
+    visitedCheckpoints: { type: [{ type: String, maxlength: 100 }], default: undefined },
     completedContents: [{ type: String, maxlength: 100 }],
     interactions: { type: [InteractionEventSchema], default: [] },
     simulationDecisions: { type: [SimulationDecisionSchema], default: [] },

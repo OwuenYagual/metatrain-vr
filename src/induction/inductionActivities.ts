@@ -4,10 +4,24 @@ export type ActivityOption = {
     feedback?: string;
 };
 
-export type ScenarioActivity = {
-    kind: 'scenario';
+export type TrainingLesson = {
+    id: string;
+    title: string;
+    explanation: string;
+    keyPoint: string;
+};
+
+type BaseActivity = {
     title: string;
     introduction: string;
+    training: {
+        greeting: string;
+        lessons: TrainingLesson[];
+    };
+};
+
+export type ScenarioActivity = BaseActivity & {
+    kind: 'scenario';
     steps: Array<{
         id: string;
         prompt: string;
@@ -16,10 +30,8 @@ export type ScenarioActivity = {
     }>;
 };
 
-export type DirectoryActivity = {
+export type DirectoryActivity = BaseActivity & {
     kind: 'directory';
-    title: string;
-    introduction: string;
     departments: Array<{
         id: string;
         name: string;
@@ -30,18 +42,14 @@ export type DirectoryActivity = {
     }>;
 };
 
-export type SequenceActivity = {
+export type SequenceActivity = BaseActivity & {
     kind: 'sequence';
-    title: string;
-    introduction: string;
     tasks: ActivityOption[];
     correctOrder: string[];
 };
 
-export type ChecklistActivity = {
+export type ChecklistActivity = BaseActivity & {
     kind: 'checklist';
-    title: string;
-    introduction: string;
     options: ActivityOption[];
     correctOptionIds: string[];
 };
@@ -53,6 +61,29 @@ export const INDUCTION_ACTIVITIES: Record<string, InductionActivity> = {
         kind: 'scenario',
         title: 'Políticas y convivencia',
         introduction: 'Resuelve situaciones cotidianas aplicando confidencialidad, respeto y uso responsable de los recursos.',
+        training: {
+            greeting: 'Bienvenido. Antes de tomar decisiones, revisaremos las tres reglas que protegen a las personas y a la información de la empresa.',
+            lessons: [
+                {
+                    id: 'confidentiality',
+                    title: 'Protege la información',
+                    explanation: 'Los documentos, datos de clientes y conversaciones internas se trabajan únicamente en herramientas corporativas autorizadas. No deben copiarse a correos personales ni carpetas públicas.',
+                    keyPoint: 'Información interna = canales corporativos y acceso autorizado.',
+                },
+                {
+                    id: 'respect',
+                    title: 'Cuida la convivencia',
+                    explanation: 'Comunícate con respeto, marca límites ante conductas ofensivas y solicita acompañamiento de Talento Humano cuando una situación se repita o no pueda resolverse directamente.',
+                    keyPoint: 'Respeto directo primero; canal formal cuando necesites apoyo.',
+                },
+                {
+                    id: 'resources',
+                    title: 'Usa responsablemente los recursos',
+                    explanation: 'Las aplicaciones, equipos y credenciales siguen controles de seguridad. Tecnología debe validar toda instalación y ninguna contraseña puede compartirse.',
+                    keyPoint: 'Tecnología autoriza software; las credenciales siempre son personales.',
+                },
+            ],
+        },
         steps: [
             {
                 id: 'policy_information',
@@ -90,6 +121,29 @@ export const INDUCTION_ACTIVITIES: Record<string, InductionActivity> = {
         kind: 'directory',
         title: 'Departamentos y personas',
         introduction: 'Explora el directorio. Debes conocer quién lidera cada área y cuándo acudir a ella.',
+        training: {
+            greeting: 'Te presentaré cómo está organizada la empresa y qué persona puede orientarte en cada tipo de necesidad.',
+            lessons: [
+                {
+                    id: 'organization',
+                    title: 'Cómo se organiza la empresa',
+                    explanation: 'Dirección General define la estrategia; Operaciones coordina el trabajo diario; Talento Humano acompaña a las personas; Tecnología administra herramientas; y Seguridad y Salud previene riesgos.',
+                    keyPoint: 'Cada área tiene una responsabilidad y un canal definidos.',
+                },
+                {
+                    id: 'people',
+                    title: 'Tus personas de referencia',
+                    explanation: 'Elena Torres lidera Dirección, Sofía Andrade acompaña desde Talento Humano, Carlos Méndez supervisa Operaciones, Diego Ruiz lidera Tecnología y Valeria León gestiona Seguridad y Salud.',
+                    keyPoint: 'Identifica a la persona y al área antes de escalar una solicitud.',
+                },
+                {
+                    id: 'channels',
+                    title: 'Usa el canal correcto',
+                    explanation: 'Las tareas se coordinan en el tablero y reuniones operativas; los accesos van a la mesa de ayuda; los beneficios al portal de Talento Humano; y los riesgos al canal de incidentes.',
+                    keyPoint: 'El canal correcto acelera la respuesta y conserva trazabilidad.',
+                },
+            ],
+        },
         departments: [
             { id: 'management', name: 'Dirección General', purpose: 'Define la estrategia y las prioridades de la empresa.', person: 'Elena Torres', role: 'Directora General', channel: 'Reunión mensual y comunicados corporativos' },
             { id: 'people', name: 'Talento Humano', purpose: 'Acompaña contratación, beneficios, desarrollo y convivencia.', person: 'Sofía Andrade', role: 'Coordinadora de Talento Humano', channel: 'Portal interno o talento@empresa.local' },
@@ -102,6 +156,29 @@ export const INDUCTION_ACTIVITIES: Record<string, InductionActivity> = {
         kind: 'sequence',
         title: 'Funciones de tu puesto',
         introduction: 'Tu puesto de referencia es Analista de Operaciones. Construye el flujo correcto de una jornada de trabajo.',
+        training: {
+            greeting: 'Como Analista de Operaciones tendrás un ciclo de trabajo claro. Conocerlo te ayudará a priorizar y pedir apoyo a tiempo.',
+            lessons: [
+                {
+                    id: 'plan',
+                    title: 'Comienza con las prioridades',
+                    explanation: 'Al iniciar la jornada revisa tareas, plazos, responsables y dependencias. Si algo no está claro, confírmalo con tu supervisor antes de ejecutar.',
+                    keyPoint: 'Primero entiende prioridad, plazo y responsable.',
+                },
+                {
+                    id: 'execute',
+                    title: 'Ejecuta el procedimiento vigente',
+                    explanation: 'Realiza las tareas asignadas siguiendo el procedimiento aprobado. Los cambios al proceso necesitan autorización y deben quedar documentados.',
+                    keyPoint: 'Ejecuta con el procedimiento; no improvises cambios sin aprobación.',
+                },
+                {
+                    id: 'report',
+                    title: 'Registra y comunica',
+                    explanation: 'Actualiza el tablero con avances y evidencias. Si aparece un bloqueo, comunícalo al supervisor junto con el impacto y una propuesta de siguiente paso.',
+                    keyPoint: 'Avance registrado y bloqueo comunicado antes de afectar el resultado.',
+                },
+            ],
+        },
         correctOrder: ['review', 'execute', 'update', 'escalate'],
         tasks: [
             { id: 'update', label: 'Actualizar el tablero con avances y evidencias.' },
@@ -114,6 +191,29 @@ export const INDUCTION_ACTIVITIES: Record<string, InductionActivity> = {
         kind: 'scenario',
         title: 'Red de apoyo',
         introduction: 'Elige el departamento correcto para resolver cada necesidad durante tu primera semana.',
+        training: {
+            greeting: 'No necesitas resolver todo por tu cuenta. Aprenderás a reconocer la red de apoyo y activar el canal adecuado.',
+            lessons: [
+                {
+                    id: 'technical_support',
+                    title: 'Soporte técnico',
+                    explanation: 'Tecnología atiende accesos, equipos, aplicaciones y seguridad informática mediante la mesa de ayuda interna.',
+                    keyPoint: 'Acceso o equipo con problemas = mesa de ayuda de Tecnología.',
+                },
+                {
+                    id: 'people_support',
+                    title: 'Acompañamiento laboral',
+                    explanation: 'Talento Humano gestiona beneficios, documentación laboral, desarrollo y situaciones de convivencia.',
+                    keyPoint: 'Beneficios o convivencia = Talento Humano.',
+                },
+                {
+                    id: 'safety_support',
+                    title: 'Riesgos e incidentes',
+                    explanation: 'Ante una condición insegura, advierte a las personas cercanas, evita exponerte y reporta inmediatamente por el canal de Seguridad y Salud.',
+                    keyPoint: 'Señaliza, protege y reporta; nunca ignores un riesgo.',
+                },
+            ],
+        },
         steps: [
             {
                 id: 'support_access',
@@ -151,6 +251,29 @@ export const INDUCTION_ACTIVITIES: Record<string, InductionActivity> = {
         kind: 'checklist',
         title: 'Reto del primer día',
         introduction: 'Selecciona únicamente las acciones que forman parte de tus responsabilidades como Analista de Operaciones.',
+        training: {
+            greeting: 'Hagamos un repaso final. Tu primer día será exitoso si trabajas con orden, trazabilidad y comunicación oportuna.',
+            lessons: [
+                {
+                    id: 'prepare',
+                    title: 'Prepárate antes de ejecutar',
+                    explanation: 'Confirma las prioridades y plazos con tu supervisor y verifica que cuentas con los accesos, el procedimiento y la información necesarios.',
+                    keyPoint: 'No comiences una tarea sin conocer el resultado esperado.',
+                },
+                {
+                    id: 'evidence',
+                    title: 'Deja evidencia del trabajo',
+                    explanation: 'Registra avances, resultados y documentos en el tablero o repositorio corporativo indicado para que el equipo pueda dar seguimiento.',
+                    keyPoint: 'Lo realizado debe quedar visible y trazable.',
+                },
+                {
+                    id: 'boundaries',
+                    title: 'Reconoce los límites de tu función',
+                    explanation: 'Puedes proponer mejoras, pero no cambiar procesos sin autorización ni compartir credenciales. Los bloqueos se comunican, no se ocultan.',
+                    keyPoint: 'Propón y escala; no cambies ni compartas accesos por tu cuenta.',
+                },
+            ],
+        },
         correctOptionIds: ['priorities', 'procedure', 'evidence', 'blockers'],
         options: [
             { id: 'priorities', label: 'Confirmar prioridades y plazos con el supervisor.' },

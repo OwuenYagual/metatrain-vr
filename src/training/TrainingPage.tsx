@@ -8,30 +8,22 @@ import { APP_CONFIG } from '../config/appConfig';
 import { authService } from '../auth/authService';
 import { getErrorMessage } from '../api/apiClient';
 import { progressService } from '../progress/progressService';
-import { calculateContentProgress, calculateProgress } from '../progress/contentProgress';
-import {
-    getNextTrainingCheckpointId,
-    TRAINING_CHECKPOINT_IDS,
-    TRAINING_CHECKPOINTS,
-} from '../../shared/trainingModule';
+import { calculateContentProgress, getCompletedStationIds } from '../progress/contentProgress';
+import { isTrainingStationUnlocked, TRAINING_STATIONS } from '../../shared/trainingModule';
 import InductionActivityPanel from '../induction/InductionActivityPanel';
 import './TrainingPage.css';
 
 export default function TrainingPage() {
-    const {
-        contents,
-        setContents,
-        activeContent,
-        setActiveContent,
-        completedContentIds,
-        setCompletedContentIds,
-        visitedCheckpointIds,
-        setVisitedCheckpointIds,
-    } = useTrainingStore();
+    const contents = useTrainingStore((state) => state.contents);
+    const setContents = useTrainingStore((state) => state.setContents);
+    const activeContent = useTrainingStore((state) => state.activeContent);
+    const setActiveContent = useTrainingStore((state) => state.setActiveContent);
+    const completedContentIds = useTrainingStore((state) => state.completedContentIds);
+    const setCompletedContentIds = useTrainingStore((state) => state.setCompletedContentIds);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [savingContent, setSavingContent] = useState(false);
-    const [checkpointNotice, setCheckpointNotice] = useState('');
+    const [menuOpen, setMenuOpen] = useState(false);
     const [moduleStatus, setModuleStatus] = useState<'not_started' | 'in_progress' | 'approved' | 'failed'>('not_started');
     const [moduleScore, setModuleScore] = useState<number | null>(null);
     const [simulationCompleted, setSimulationCompleted] = useState(false);
@@ -47,19 +39,12 @@ export default function TrainingPage() {
         () => new Set(completedContentIds),
         [completedContentIds],
     );
-    const checkpointProgress = useMemo(() => calculateProgress(
-        TRAINING_CHECKPOINT_IDS,
-        visitedCheckpointIds,
-    ), [visitedCheckpointIds]);
-    const visitedCheckpointSet = useMemo(
-        () => new Set(visitedCheckpointIds),
-        [visitedCheckpointIds],
+    const completedStationIds = useMemo(
+        () => getCompletedStationIds(contents, completedContentIds),
+        [completedContentIds, contents],
     );
-    const nextCheckpointId = getNextTrainingCheckpointId(visitedCheckpointIds);
     const requiredContentsCompleted = contentProgress.totalCount >= APP_CONFIG.MIN_REQUIRED_CONTENTS
         && contentProgress.completedCount === contentProgress.totalCount;
-    const requiredCheckpointsCompleted = checkpointProgress.completedCount === APP_CONFIG.MIN_REQUIRED_CHECKPOINTS;
-    const guidedRouteCompleted = requiredContentsCompleted && requiredCheckpointsCompleted;
     const moduleFinalized = moduleStatus === 'approved' || moduleStatus === 'failed';
     const evaluationAvailable = simulationCompleted || moduleFinalized;
     const activeContentCompleted = activeContent
@@ -75,7 +60,6 @@ export default function TrainingPage() {
         const controller = new AbortController();
         setContents([]);
         setCompletedContentIds([]);
-        setVisitedCheckpointIds([]);
         setActiveContent(null);
 
         Promise.all([
@@ -89,7 +73,6 @@ export default function TrainingPage() {
             .then(([loadedContents, savedProgress]) => {
                 setContents(loadedContents);
                 setCompletedContentIds(savedProgress?.completedContents ?? []);
-                setVisitedCheckpointIds(savedProgress?.visitedCheckpoints ?? []);
                 setModuleStatus(savedProgress?.status ?? 'not_started');
                 setModuleScore(savedProgress?.score ?? null);
                 setSimulationCompleted(savedProgress?.simulationCompleted ?? false);
@@ -110,7 +93,6 @@ export default function TrainingPage() {
         session?.participant.avatarId,
         setActiveContent,
         setCompletedContentIds,
-        setVisitedCheckpointIds,
         setContents,
     ]);
 
@@ -147,43 +129,28 @@ export default function TrainingPage() {
 
     return (
         <main className="training-page">
-            <section className="training-hud">
-                <h1 style={{ margin: 0, fontSize: '1.35rem' }}>Inducción: conoce tu empresa</h1>
-                <p>Recorre la oficina y supera cinco actividades sobre políticas, personas, departamentos y tu puesto.</p>
+            <button
+                type="button"
+                className={`training-menu-toggle ${menuOpen ? 'is-open' : ''}`}
+                aria-label={menuOpen ? 'Cerrar menú de capacitación' : 'Abrir menú de capacitación'}
+                aria-expanded={menuOpen}
+                aria-controls="training-navigation"
+                onClick={() => setMenuOpen((current) => !current)}
+            >
+                <span className="training-menu-icon" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                </span>
+            </button>
+
+            {menuOpen && (
+                <section id="training-navigation" className="training-hud">
+                    <h1 style={{ margin: 0, fontSize: '1.35rem' }}>Inducción: conoce tu empresa</h1>
+                    <p>Sigue la ruta entrecortada, conversa con cada guía y observa cómo se pinta de verde al superar las estaciones.</p>
                 {loading && <p>Cargando contenidos...</p>}
-                {!loading && (
-                    <section aria-labelledby="checkpoint-progress-title" aria-live="polite" style={{ marginTop: '0.85rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'baseline' }}>
-                            <h2 id="checkpoint-progress-title" style={{ margin: '0 0 0.4rem', fontSize: '1rem' }}>
-                                Checkpoints del recorrido
-                            </h2>
-                            <strong>{checkpointProgress.completedCount} de {checkpointProgress.totalCount}</strong>
-                        </div>
-                        <progress
-                            aria-label="Checkpoints visitados"
-                            value={checkpointProgress.completedCount}
-                            max={checkpointProgress.totalCount}
-                            style={{ width: '100%', height: '0.85rem', accentColor: '#2563eb' }}
-                        />
-                        <ol style={{ listStyle: 'none', padding: 0, margin: '0.35rem 0 0.9rem', display: 'grid', gap: '0.25rem' }}>
-                            {TRAINING_CHECKPOINTS.map((checkpoint) => {
-                                const visited = visitedCheckpointSet.has(checkpoint.id);
-                                const next = checkpoint.id === nextCheckpointId;
-                                const status = visited ? 'Visitado' : next ? 'Siguiente' : 'Bloqueado';
-                                const color = visited ? '#166534' : next ? '#1d4ed8' : '#64748b';
-                                return (
-                                    <li key={checkpoint.id} style={{ color }}>
-                                        <span aria-hidden="true">{visited ? '✓' : next ? '●' : '○'}</span>{' '}
-                                        {checkpoint.label}
-                                        <span style={{ fontSize: '0.85rem' }}> — {status}</span>
-                                    </li>
-                                );
-                            })}
-                        </ol>
-                    </section>
-                )}
                 {!loading && contentProgress.totalCount > 0 && (
-                    <section aria-labelledby="content-progress-title" aria-live="polite" style={{ borderTop: '1px solid #cbd5e1', paddingTop: '0.75rem' }}>
+                    <section aria-labelledby="content-progress-title" aria-live="polite" style={{ marginTop: '0.85rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'baseline' }}>
                             <h2 id="content-progress-title" style={{ margin: '0 0 0.4rem', fontSize: '1rem' }}>
                                 Estaciones interactivas
@@ -202,26 +169,41 @@ export default function TrainingPage() {
                         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.3rem' }}>
                             {contents.map((content) => {
                                 const completed = completedContentSet.has(content._id);
+                                const station = TRAINING_STATIONS.find(({ id }) => id === content.interactionObjectId);
+                                const unlocked = isTrainingStationUnlocked(
+                                    content.interactionObjectId,
+                                    completedStationIds,
+                                );
+                                const status = completed ? 'Superada' : unlocked ? 'Disponible' : 'Bloqueada';
                                 return (
                                     <li key={content._id}>
                                         <button
                                             type="button"
-                                            aria-label={`Abrir actividad: ${content.title}`}
-                                            onClick={() => setActiveContent(content)}
+                                            aria-label={unlocked
+                                                ? `Habla con ${station?.guide.name ?? 'tu guía'} sobre ${content.title}.`
+                                                : `${content.title}: bloqueada hasta completar la estación anterior.`}
+                                            onClick={() => {
+                                                if (unlocked) {
+                                                    setActiveContent(content);
+                                                    setMenuOpen(false);
+                                                }
+                                            }}
+                                            disabled={!unlocked}
                                             style={{
                                                 width: '100%',
-                                                border: `1px solid ${completed ? '#86efac' : '#cbd5e1'}`,
+                                                border: `1px solid ${completed ? '#86efac' : unlocked ? '#cbd5e1' : '#d8dee8'}`,
                                                 borderRadius: 6,
-                                                background: completed ? '#f0fdf4' : '#f8fafc',
+                                                background: completed ? '#f0fdf4' : unlocked ? '#f8fafc' : '#e2e8f0',
                                                 padding: '0.42rem 0.55rem',
-                                                color: completed ? '#166534' : '#334155',
+                                                color: completed ? '#166534' : unlocked ? '#334155' : '#64748b',
                                                 textAlign: 'left',
-                                                cursor: 'pointer',
+                                                cursor: unlocked ? 'pointer' : 'not-allowed',
+                                                opacity: unlocked ? 1 : 0.72,
                                             }}
                                         >
-                                            <span aria-hidden="true">{completed ? '✓' : '○'}</span>{' '}
+                                            <span aria-hidden="true">{completed ? '✓' : unlocked ? '●' : '🔒'}</span>{' '}
                                             {content.title}
-                                            <span style={{ fontSize: '0.85rem' }}> — {completed ? 'Superada' : 'Pendiente'}</span>
+                                            <span style={{ fontSize: '0.85rem' }}> — {status}</span>
                                         </button>
                                     </li>
                                 );
@@ -229,7 +211,7 @@ export default function TrainingPage() {
                         </ul>
                     </section>
                 )}
-                {guidedRouteCompleted ? (
+                {requiredContentsCompleted && (
                     <section style={{ padding: '0.75rem', margin: '0.9rem 0 0', background: evaluationAvailable ? '#dcfce7' : '#fff7ed', color: evaluationAvailable ? '#166534' : '#9a3412', borderRadius: 6 }}>
                         <p role="status" style={{ fontWeight: 600 }}>
                             {evaluationAvailable
@@ -243,7 +225,10 @@ export default function TrainingPage() {
                         )}
                         <button
                             type="button"
-                            onClick={() => navigate(evaluationAvailable ? '/evaluation' : '/simulation')}
+                            onClick={() => {
+                                setMenuOpen(false);
+                                navigate(evaluationAvailable ? '/evaluation' : '/simulation');
+                            }}
                             style={{ marginTop: '0.65rem', padding: '0.65rem 0.8rem', background: evaluationAvailable ? '#166534' : '#c2410c', color: '#fff', border: 0, borderRadius: 6, fontWeight: 700 }}
                         >
                             {moduleFinalized
@@ -253,24 +238,16 @@ export default function TrainingPage() {
                                     : 'Iniciar reto de integración'}
                         </button>
                     </section>
-                ) : requiredContentsCompleted ? (
-                    <p role="status" style={{ padding: '0.65rem', margin: '0.9rem 0 0', background: '#eff6ff', color: '#1d4ed8', borderRadius: 6 }}>
-                        Has superado todas las actividades. Completa los checkpoints pendientes.
-                    </p>
-                ) : requiredCheckpointsCompleted ? (
-                    <p role="status" style={{ padding: '0.65rem', margin: '0.9rem 0 0', background: '#eff6ff', color: '#1d4ed8', borderRadius: 6 }}>
-                        Has visitado todos los checkpoints. Supera las estaciones pendientes.
-                    </p>
-                ) : null}
-                {checkpointNotice && <p role="status" style={{ marginTop: '0.65rem', color: '#166534' }}>{checkpointNotice}</p>}
+                )}
                 {!loading && contents.length < APP_CONFIG.MIN_REQUIRED_CONTENTS && (
                     <p role="alert" style={{ color: '#92400e' }}>
                         El módulo requiere al menos {APP_CONFIG.MIN_REQUIRED_CONTENTS} contenidos; se encontraron {contents.length}.
                     </p>
                 )}
                 {error && <p role="alert" style={{ color: '#b91c1c' }}>{error}</p>}
-                <button type="button" onClick={logout} style={{ marginTop: '0.75rem' }}>Cerrar sesión</button>
-            </section>
+                    <button type="button" onClick={logout} style={{ marginTop: '0.75rem' }}>Cerrar sesión</button>
+                </section>
+            )}
 
             {activeContent && (
                 <InductionActivityPanel
@@ -283,18 +260,9 @@ export default function TrainingPage() {
                 />
             )}
 
-            <div className="training-scene-shell">
+            <div className={`training-scene-shell ${activeContent ? 'has-active-station' : ''}`}>
                 <SceneErrorBoundary>
-                    <TrainingScene
-                        onCheckpointSaved={(message) => {
-                            setError('');
-                            setCheckpointNotice(message);
-                        }}
-                        onCheckpointError={(message) => {
-                            setCheckpointNotice('');
-                            setError(message);
-                        }}
-                    />
+                    <TrainingScene onStationOpen={() => setMenuOpen(false)} />
                 </SceneErrorBoundary>
             </div>
         </main>

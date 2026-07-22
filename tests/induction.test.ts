@@ -4,10 +4,59 @@ import {
     INDUCTION_ACTIVITIES,
     isChecklistSelectionCorrect,
 } from '../src/induction/inductionActivities';
+import {
+    buildNpcSpeechBubbles,
+    getNpcSpeechRevealInterval,
+    NPC_BUBBLE_PAUSE_MS,
+    NPC_SPEECH_SPEED_OPTIONS,
+    NPC_TEXT_REVEAL_INTERVAL_MS,
+} from '../src/induction/npcSpeech';
 import { TRAINING_INTERACTION_OBJECT_IDS } from '../shared/trainingModule';
 
 test('cada estación 3D tiene una actividad de inducción configurada', () => {
     assert.deepEqual(Object.keys(INDUCTION_ACTIVITIES).sort(), [...TRAINING_INTERACTION_OBJECT_IDS].sort());
+});
+
+test('cada actividad capacita antes de evaluar', () => {
+    for (const activity of Object.values(INDUCTION_ACTIVITIES)) {
+        assert.ok(activity.training.greeting.length > 20);
+        assert.ok(activity.training.lessons.length >= 3);
+        assert.ok(activity.training.lessons.every((lesson) => (
+            lesson.title.length > 0
+            && lesson.explanation.length > 40
+            && lesson.keyPoint.length > 20
+        )));
+    }
+});
+
+test('el NPC presenta cada lección como una secuencia legible de globos', () => {
+    const activity = INDUCTION_ACTIVITIES.obj_manual;
+    const firstLessonBubbles = buildNpcSpeechBubbles(activity, 0);
+    const nextLessonBubbles = buildNpcSpeechBubbles(activity, 1);
+
+    assert.deepEqual(
+        firstLessonBubbles.map((bubble) => bubble.kind),
+        ['greeting', 'explanation', 'key-point'],
+    );
+    assert.deepEqual(
+        nextLessonBubbles.map((bubble) => bubble.kind),
+        ['explanation', 'key-point'],
+    );
+    assert.ok(firstLessonBubbles.every((bubble) => bubble.text.trim().length > 0));
+});
+
+test('la velocidad de escritura y la pausa del NPC se mantienen en un rango cómodo', () => {
+    assert.ok(NPC_TEXT_REVEAL_INTERVAL_MS >= 15 && NPC_TEXT_REVEAL_INTERVAL_MS <= 35);
+    assert.ok(NPC_BUBBLE_PAUSE_MS >= 500 && NPC_BUBBLE_PAUSE_MS <= 1_000);
+});
+
+test('el participante puede elegir una velocidad lenta, normal o rápida', () => {
+    assert.deepEqual(
+        NPC_SPEECH_SPEED_OPTIONS.map((option) => option.value),
+        ['slow', 'normal', 'fast'],
+    );
+    assert.ok(getNpcSpeechRevealInterval('slow') > getNpcSpeechRevealInterval('normal'));
+    assert.ok(getNpcSpeechRevealInterval('normal') > getNpcSpeechRevealInterval('fast'));
 });
 
 test('el directorio presenta los departamentos y una persona de referencia', () => {

@@ -1,14 +1,16 @@
 .station-label {
     font: inherit;
-    display: grid;
-    gap: 0.15rem;
-    min-width: 138px;
+    display: block;
+    width: 184px;
     border: 1px solid rgba(148, 163, 184, 0.8);
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.92);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
-    padding: 0.42rem 0.55rem;
+    padding: 0.55rem 0.65rem;
     color: #172033;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.4;
     text-align: center;
     transition: transform 160ms ease, border-color 160ms ease;
     backdrop-filter: blur(8px);
@@ -20,46 +22,156 @@
     border-color: #4f46e5;
 }
 
-.station-label.is-completed {
-    border-color: #22c55e;
-    background: rgba(240, 253, 244, 0.94);
-}
-
 .station-label span {
-    color: #4f46e5;
-    font-size: 0.68rem;
-    font-weight: 900;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-}
-
-.station-label.is-completed span {
-    color: #166534;
+    color: #475569;
+    font-weight: 700;
 }
 
 .station-label strong {
-    font-size: 0.84rem;
-    line-height: 1.2;
+    color: #4338ca;
+    font-size: inherit;
 }
 
-.station-label small {
-    color: #64748b;
-    font-size: 0.7rem;
+.station-dialogue-bubble {
+    position: relative;
+    width: min(350px, 40vw);
+    box-sizing: border-box;
+    border: 2px solid #818cf8;
+    border-radius: 18px 18px 18px 6px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.28);
+    padding: 0.85rem 1rem;
+    color: #273449;
+    text-align: left;
+    backdrop-filter: blur(10px);
+    animation: station-dialogue-arrival 220ms ease-out;
 }
 
-.checkpoint-label {
-    font: inherit;
-    white-space: nowrap;
-    border-radius: 999px;
-    background: rgba(37, 99, 235, 0.92);
-    box-shadow: 0 5px 16px rgba(30, 64, 175, 0.25);
-    padding: 0.35rem 0.6rem;
-    color: #fff;
+.station-dialogue-bubble::after {
+    position: absolute;
+    bottom: -0.58rem;
+    left: 68%;
+    width: 1rem;
+    height: 1rem;
+    border-right: 2px solid #818cf8;
+    border-bottom: 2px solid #818cf8;
+    background: inherit;
+    content: '';
+    transform: rotate(45deg);
+}
+
+.performance-mode-indicator {
+    position: absolute;
+    z-index: 12;
+    top: 20px;
+    left: 84px;
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    box-sizing: border-box;
+    border: 1px solid rgba(245, 158, 11, 0.38);
+    border-radius: 14px;
+    background: rgba(255, 251, 235, 0.96);
+    box-shadow: 0 9px 24px rgba(120, 53, 15, 0.18);
+    color: #b45309;
+    backdrop-filter: blur(10px);
+}
+
+.performance-mode-indicator svg {
+    width: 25px;
+    height: 25px;
+    fill: none;
+    stroke: currentcolor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.9;
+}
+
+.performance-mode-indicator circle {
+    fill: currentcolor;
+    stroke: none;
+}
+
+@media (max-width: 900px) {
+    .performance-mode-indicator {
+        top: 12px;
+        left: 74px;
+    }
+}
+
+.station-dialogue-bubble.is-greeting {
+    border-color: #6366f1;
+    background: rgba(238, 242, 255, 0.98);
+    color: #3730a3;
+}
+
+.station-dialogue-bubble.is-greeting::after {
+    border-color: #6366f1;
+}
+
+.station-dialogue-bubble.is-key-point {
+    border-color: #22c55e;
+    background: rgba(240, 253, 244, 0.98);
+    color: #166534;
+}
+
+.station-dialogue-bubble.is-key-point::after {
+    border-color: #22c55e;
+}
+
+.station-dialogue-speaker,
+.station-dialogue-bubble > strong {
+    display: block;
+}
+
+.station-dialogue-speaker {
+    margin-bottom: 0.16rem;
+    color: #4338ca;
     font-size: 0.72rem;
-    font-weight: 800;
-    cursor: pointer;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
 
-.checkpoint-label.is-visited {
-    background: rgba(22, 101, 52, 0.92);
+.station-dialogue-bubble > strong {
+    margin-bottom: 0.38rem;
+    font-size: 0.86rem;
+}
+
+.station-dialogue-bubble p {
+    min-height: 2.8em;
+    margin: 0;
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.station-dialogue-cursor {
+    color: #4f46e5;
+    animation: station-dialogue-cursor 700ms steps(1) infinite;
+}
+
+@keyframes station-dialogue-arrival {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes station-dialogue-cursor {
+    50% {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .station-dialogue-bubble,
+    .station-dialogue-cursor {
+        animation: none;
+    }
 }
