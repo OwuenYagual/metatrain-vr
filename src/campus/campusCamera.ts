@@ -13,6 +13,7 @@ const THIRD_PERSON_YAW_SENSITIVITY = 0.0022;
 const THIRD_PERSON_PITCH_SENSITIVITY = 0.0018;
 const THIRD_PERSON_MIN_PITCH = 0.08;
 const THIRD_PERSON_MAX_PITCH = 1.05;
+const THIRD_PERSON_FOLLOW_SPEED = 5;
 const CAMERA_COLLISION_PADDING = 0.24;
 const CAMERA_MIN_DISTANCE = 0.08;
 
@@ -23,6 +24,11 @@ export const THIRD_PERSON_INITIAL_PITCH = Math.atan2(
 
 function clamp(value: number, minimum: number, maximum: number): number {
     return Math.min(maximum, Math.max(minimum, value));
+}
+
+function shortestAngleDifference(from: number, to: number): number {
+    const fullTurn = Math.PI * 2;
+    return ((to - from + Math.PI) % fullTurn + fullTurn) % fullTurn - Math.PI;
 }
 
 export function createThirdPersonOrbit(initialYaw: number): ThirdPersonOrbit {
@@ -44,6 +50,20 @@ export function updateThirdPersonOrbit(
             THIRD_PERSON_MIN_PITCH,
             THIRD_PERSON_MAX_PITCH,
         ),
+    };
+}
+
+export function followThirdPersonOrbit(
+    orbit: ThirdPersonOrbit,
+    targetYaw: number,
+    deltaSeconds: number,
+): ThirdPersonOrbit {
+    const interpolation = 1 - Math.exp(
+        -Math.max(0, deltaSeconds) * THIRD_PERSON_FOLLOW_SPEED,
+    );
+    return {
+        yaw: orbit.yaw + shortestAngleDifference(orbit.yaw, targetYaw) * interpolation,
+        pitch: orbit.pitch,
     };
 }
 

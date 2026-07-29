@@ -10,7 +10,6 @@ import {
     Euler,
     MathUtils,
     Object3D,
-    Raycaster,
     Vector3,
 } from 'three';
 import type { AvatarId } from '../auth/authService';
@@ -21,6 +20,7 @@ import {
 import { getCampusMovementVector, type CampusMovementState } from './campusControls';
 import {
     createThirdPersonOrbit,
+    followThirdPersonOrbit,
     getCollisionSafeCameraDistance,
     getThirdPersonCameraOffset,
     updateThirdPersonOrbit,
@@ -33,17 +33,7 @@ export type CampusCameraMode = 'third-person' | 'first-person';
 const PLAYER_CENTER_HEIGHT = 0.88;
 const WALK_SPEED = 2.35;
 const RUN_SPEED = 4.4;
-const CAMERA_RAYCASTER = new Raycaster();
-
-function isCameraBlocker(object: Object3D): boolean {
-    let candidate: Object3D | null = object;
-    while (candidate) {
-        if (candidate.userData.cameraBlocker === true) return true;
-        if (candidate.userData.ignoreCameraCollision === true) return false;
-        candidate = candidate.parent;
-    }
-    return false;
-}
+const MANUAL_CAMERA_FOLLOW_DELAY_MS = 1_200;
 
 function getClosestTarget(
     position: Vector3,
@@ -94,12 +84,14 @@ export function CampusPlayer({
     const nearbyIdRef = useRef<string | null>(null);
     const avatarYawRef = useRef(spawn.rotationY);
     const thirdPersonOrbitRef = useRef(createThirdPersonOrbit(spawn.rotationY));
+    const thirdPersonDraggingRef = useRef(false);
+    const lastManualCameraMoveAtRef = useRef(Number.NEGATIVE_INFINITY);
     const cameraYawRef = useRef(spawn.rotationY + Math.PI);
     const cameraPitchRef = useRef(-0.04);
     const cameraInitializedRef = useRef(false);
     const stepDistanceRef = useRef(0);
-    const { camera, gl, scene } = useThree();
-    const { world } = useRapier();
+    const { camera, gl } = useThree();
+    const { rapier, world } = useRapier();
     const characterControllerRef = useRef<ReturnType<typeof world.createCharacterController> | null>(null);
 
     useEffect(() => {
@@ -139,6 +131,7 @@ export function CampusPlayer({
                     clickResetTimeout = null;
                 }, 0);
             }
+            thirdPersonDraggingRef.current = false;
             activePointerId = null;
             if (canvas.hasPointerCapture(event.pointerId)) {
                 canvas.releasePointerCapture(event.pointerId);
@@ -146,6 +139,8 @@ export function CampusPlayer({
         };
         const handlePointerDown = (event: PointerEvent) => {
             if (event.button !== 0) return;
+            thirdPersonDraggingRef.current = true;
+            lastManualCameraMoveAtRef.current = performance.now();
             activePointerId = event.pointerId;
             dragDistance = 0;
             canvas.setPointerCapture(event.pointerId);
@@ -154,6 +149,7 @@ export function CampusPlayer({
         const handlePointerMove = (event: PointerEvent) => {
             if (event.pointerId !== activePointerId || (event.buttons & 1) === 0) return;
             dragDistance += Math.hypot(event.movementX, event.movementY);
+            lastManualCameraMoveAtRef.current = performance.now();
             thirdPersonOrbitRef.current = updateThirdPersonOrbit(
                 thirdPersonOrbitRef.current,
                 event.movementX,
@@ -183,6 +179,7 @@ export function CampusPlayer({
             canvas.removeEventListener('pointercancel', stopDragging);
             canvas.removeEventListener('lostpointercapture', stopDragging);
             canvas.removeEventListener('click', handleClickCapture, true);
+            thirdPersonDraggingRef.current = false;
             if (clickResetTimeout !== null) window.clearTimeout(clickResetTimeout);
         };
     }, [cameraMode, gl.domElement]);
@@ -282,6 +279,19 @@ export function CampusPlayer({
             return;
         }
 
+        const manualFollowDelayElapsed = performance.now()
+            - lastManualCameraMoveAtRef.current >= MANUAL_CAMERA_FOLLOW_DELAY_MS;
+        if (!paused
+            && !movement.moving
+            && !thirdPersonDraggingRef.current
+            && manualFollowDelayElapsed) {
+            thirdPersonOrbitRef.current = followThirdPersonOrbit(
+                thirdPersonOrbitRef.current,
+                avatarYawRef.current,
+                delta,
+            );
+        }
+
         const lookTarget = updatedPosition.clone().add(new Vector3(0, 0.28, 0));
         const [offsetX, offsetY, offsetZ] = getThirdPersonCameraOffset(
             thirdPersonOrbitRef.current,
@@ -291,13 +301,18 @@ export function CampusPlayer({
         const rayDirection = desiredPosition.clone().sub(lookTarget);
         const desiredDistance = rayDirection.length();
         rayDirection.normalize();
-        CAMERA_RAYCASTER.set(lookTarget, rayDirection);
-        CAMERA_RAYCASTER.far = desiredDistance;
-        const hit = CAMERA_RAYCASTER.intersectObjects(scene.children, true)
-            .find((intersection) => isCameraBlocker(intersection.object));
+        const hit = world.castRay(
+            new rapier.Ray(lookTarget, rayDirection),
+            desiredDistance,
+            true,
+            undefined,
+            undefined,
+            undefined,
+            body,
+        );
         const safeDistance = getCollisionSafeCameraDistance(
             desiredDistance,
-            hit?.distance ?? null,
+            hit?.timeOfImpact ?? null,
         );
         const collisionSafePosition = lookTarget.clone().addScaledVector(rayDirection, safeDistance);
 

@@ -10,6 +10,7 @@ import {
 import {
     THIRD_PERSON_INITIAL_PITCH,
     createThirdPersonOrbit,
+    followThirdPersonOrbit,
     getCollisionSafeCameraDistance,
     getThirdPersonCameraOffset,
     updateThirdPersonOrbit,
@@ -72,6 +73,27 @@ test('aplica sensibilidad horizontal y vertical sin mutar la órbita', () => {
     });
     assertApproximatelyEqual(updated.yaw, 0.48);
     assertApproximatelyEqual(updated.pitch, THIRD_PERSON_INITIAL_PITCH + 0.09);
+});
+
+test('acompaña suavemente la orientación del personaje al terminar el movimiento', () => {
+    const orbit = createThirdPersonOrbit(0);
+    const followed = followThirdPersonOrbit(orbit, Math.PI / 2, 0.2);
+
+    assert.deepEqual(orbit, {
+        yaw: 0,
+        pitch: THIRD_PERSON_INITIAL_PITCH,
+    });
+    assert.ok(followed.yaw > orbit.yaw);
+    assert.ok(followed.yaw < Math.PI / 2);
+    assert.equal(followed.pitch, orbit.pitch);
+});
+
+test('sigue la ruta angular más corta al cruzar el límite de la órbita', () => {
+    const orbit = createThirdPersonOrbit(Math.PI - 0.05);
+    const followed = followThirdPersonOrbit(orbit, -Math.PI + 0.05, 0.2);
+
+    assert.ok(followed.yaw > orbit.yaw);
+    assert.ok(followed.yaw - orbit.yaw < 0.1);
 });
 
 test('limita la inclinación de tercera persona en ambos extremos', () => {

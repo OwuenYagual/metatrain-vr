@@ -444,6 +444,18 @@ test('reenfoca el canvas al cambiar de zona en tercera persona', async ({ page }
     await expect.poll(() => page.evaluate(() => document.activeElement?.tagName)).toBe('CANVAS');
     await expect(canvas).toHaveAttribute('role', 'application');
     await expect(canvas).toHaveAttribute('aria-label', /Centro de inducción/i);
+
+    await page.keyboard.down('w');
+    try {
+        await expect(page.getByRole('button', {
+            name: /Estaci.n de inducci.n 2 bloqueado/i,
+        })).toBeVisible({ timeout: 8_000 });
+    } finally {
+        await page.keyboard.up('w');
+    }
+    await expect(page.getByRole('button', {
+        name: /Cambiar a c.mara en primera persona/i,
+    })).toBeVisible();
 });
 
 test('guarda las transiciones de zona en el mismo orden en que ocurren', async ({ page }) => {
