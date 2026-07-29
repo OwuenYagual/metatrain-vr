@@ -8,7 +8,7 @@ import {
     type ScenarioActivity,
     type SequenceActivity,
     type ChecklistActivity,
-} from './inductionActivities';
+} from '../../shared/inductionActivities';
 import { TRAINING_STATIONS } from '../../shared/trainingModule';
 import {
     buildNpcSpeechBubbles,
@@ -21,6 +21,7 @@ import {
     type NpcSpeechBubble,
 } from './npcSpeech';
 import { useTrainingStore } from '../store/useTrainingStore';
+import type { NpcNarrationState } from '../speech/useNpcNarration';
 import './InductionActivityPanel.css';
 
 type InductionActivityPanelProps = {
@@ -29,6 +30,10 @@ type InductionActivityPanelProps = {
     saving: boolean;
     onComplete: () => void;
     onClose: () => void;
+    narration?: NpcNarrationState;
+    audioStarted?: boolean;
+    voiceVolume?: number;
+    onVoiceVolumeChange?: (volume: number) => void;
 };
 
 type ScenarioFeedback = { correct: boolean; message: string; optionId: string } | null;
@@ -36,6 +41,14 @@ type ScenarioFeedback = { correct: boolean; message: string; optionId: string } 
 type GuideProfile = (typeof TRAINING_STATIONS)[number]['guide'];
 
 const NPC_SPEECH_SPEED_STORAGE_KEY = 'metatrain:npc-speech-speed';
+const UNAVAILABLE_NARRATION: NpcNarrationState = {
+    available: false,
+    status: 'idle',
+    error: '',
+    replay: () => undefined,
+    stop: () => undefined,
+};
+const ignoreAudioControl = () => undefined;
 
 function getSavedNpcSpeechSpeed(): NpcSpeechSpeed {
     if (typeof window === 'undefined') return DEFAULT_NPC_SPEECH_SPEED;
@@ -63,6 +76,8 @@ function NpcSpeechLesson({
     stationId,
     revealIntervalMs,
     isLastLesson,
+    waitForNarration,
+    narrationStatus,
     onPrevious,
     onContinue,
 }: {
@@ -71,6 +86,8 @@ function NpcSpeechLesson({
     stationId: string;
     revealIntervalMs: number;
     isLastLesson: boolean;
+    waitForNarration: boolean;
+    narrationStatus: NpcNarrationState['status'];
     onPrevious?: () => void;
     onContinue: () => void;
 }) {
@@ -86,6 +103,8 @@ function NpcSpeechLesson({
     const typing = Boolean(currentBubble && characterCount < currentBubble.text.length);
     const playbackComplete = bubbleIndex === lastBubbleIndex
         && characterCount >= (currentBubble?.text.length ?? 0);
+    const narrationBusy = waitForNarration
+        && (narrationStatus === 'loading' || narrationStatus === 'playing');
     const setActiveNpcSpeech = useTrainingStore((state) => state.setActiveNpcSpeech);
 
     useEffect(() => {
@@ -99,12 +118,14 @@ function NpcSpeechLesson({
             return () => window.clearTimeout(timer);
         }
 
+        if (narrationBusy) return undefined;
+
         const timer = window.setTimeout(() => {
             setBubbleIndex((current) => current + 1);
             setCharacterCount(0);
         }, NPC_BUBBLE_PAUSE_MS);
         return () => window.clearTimeout(timer);
-    }, [characterCount, currentBubble, playbackComplete, revealIntervalMs]);
+    }, [characterCount, currentBubble, narrationBusy, playbackComplete, revealIntervalMs]);
 
     useEffect(() => {
         if (!currentBubble) {
@@ -115,13 +136,14 @@ function NpcSpeechLesson({
         setActiveNpcSpeech({
             stationId,
             bubbleId: currentBubble.id,
+            nextBubbleId: bubbles[bubbleIndex + 1]?.id,
             kind: currentBubble.kind,
             label: currentBubble.label,
             visibleText,
             fullText: currentBubble.text,
             typing,
         });
-    }, [currentBubble, setActiveNpcSpeech, stationId, typing, visibleText]);
+    }, [bubbleIndex, bubbles, currentBubble, setActiveNpcSpeech, stationId, typing, visibleText]);
 
     useEffect(() => () => {
         setActiveNpcSpeech(null);
@@ -176,11 +198,15 @@ function TrainerConversation({
     guide,
     stationId,
     onComplete,
+    waitForNarration,
+    narrationStatus,
 }: {
     activity: InductionActivity;
     guide: GuideProfile;
     stationId: string;
     onComplete: () => void;
+    waitForNarration: boolean;
+    narrationStatus: NpcNarrationState['status'];
 }) {
     const [lessonIndex, setLessonIndex] = useState(0);
     const [speechSpeed, setSpeechSpeed] = useState<NpcSpeechSpeed>(getSavedNpcSpeechSpeed);
@@ -247,6 +273,8 @@ function TrainerConversation({
                 stationId={stationId}
                 revealIntervalMs={revealIntervalMs}
                 isLastLesson={isLastLesson}
+                waitForNarration={waitForNarration}
+                narrationStatus={narrationStatus}
                 onPrevious={lessonIndex > 0 ? () => setLessonIndex((current) => current - 1) : undefined}
                 onContinue={() => {
                     if (isLastLesson) onComplete();
@@ -467,6 +495,10 @@ export default function InductionActivityPanel({
     saving,
     onComplete,
     onClose,
+    narration = UNAVAILABLE_NARRATION,
+    audioStarted = false,
+    voiceVolume = 0.85,
+    onVoiceVolumeChange = ignoreAudioControl,
 }: InductionActivityPanelProps) {
     const activity = INDUCTION_ACTIVITIES[content.interactionObjectId];
     const station = TRAINING_STATIONS.find(({ id }) => id === content.interactionObjectId);
@@ -505,12 +537,41 @@ export default function InductionActivityPanel({
             {!activity || !station ? (
                 <p role="alert">Esta estación todavía no tiene una capacitación configurada.</p>
             ) : phase === 'training' ? (
-                <TrainerConversation
-                    activity={activity}
-                    guide={station.guide}
-                    stationId={station.id}
-                    onComplete={() => setPhase('practice')}
-                />
+                <>
+                    <section className="npc-narration-controls" aria-label="Controles de voz del NPC">
+                        <button
+                            type="button"
+                            onClick={narration.replay}
+                            disabled={!audioStarted || narration.available !== true || narration.status === 'loading'}
+                        >
+                            {narration.status === 'loading' ? 'Cargando voz…' : 'Repetir narración'}
+                        </button>
+                        <label>
+                            <span>Volumen de voz</span>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={voiceVolume}
+                                onChange={(event) => onVoiceVolumeChange(Number(event.target.value))}
+                            />
+                        </label>
+                        <p aria-live="polite">
+                            {narration.available === false
+                                ? 'La voz no está disponible. La capacitación continúa con subtítulos.'
+                                : narration.error || (narration.status === 'playing' ? 'El NPC está narrando.' : '')}
+                        </p>
+                    </section>
+                    <TrainerConversation
+                        activity={activity}
+                        guide={station.guide}
+                        stationId={station.id}
+                        waitForNarration={Boolean(audioStarted && narration.available)}
+                        narrationStatus={narration.status}
+                        onComplete={() => setPhase('practice')}
+                    />
+                </>
             ) : (
                 <>
                     <div className="practice-unlocked-note" role="status">

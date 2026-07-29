@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { APP_CONFIG } from '../config/appConfig';
 
@@ -7,6 +7,13 @@ export function PerformanceMonitor({ onLowPerformance }: { onLowPerformance: () 
     const lastSampleAt = useRef(0);
     const lowPerformanceDuration = useRef(0);
     const activated = useRef(false);
+    const notificationTimer = useRef<number | null>(null);
+
+    useEffect(() => () => {
+        if (notificationTimer.current !== null) {
+            window.clearTimeout(notificationTimer.current);
+        }
+    }, []);
 
     useFrame(() => {
         frameCount.current += 1;
@@ -28,7 +35,10 @@ export function PerformanceMonitor({ onLowPerformance }: { onLowPerformance: () 
 
         if (!activated.current && lowPerformanceDuration.current >= APP_CONFIG.LOW_PERFORMANCE_DURATION_MS) {
             activated.current = true;
-            onLowPerformance();
+            notificationTimer.current = window.setTimeout(() => {
+                notificationTimer.current = null;
+                onLowPerformance();
+            }, 0);
         }
     });
 

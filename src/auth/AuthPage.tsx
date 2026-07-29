@@ -1,10 +1,9 @@
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { authService } from './authService';
+import { useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { getErrorMessage } from '../api/apiClient';
-import { progressService } from '../progress/progressService';
 import { APP_CONFIG } from '../config/appConfig';
+import { progressService } from '../progress/progressService';
+import { authService } from './authService';
 
 export default function AuthPage() {
     const [email, setEmail] = useState('');
@@ -13,8 +12,8 @@ export default function AuthPage() {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleLogin = async (e: FormEvent) => {
-        e.preventDefault();
+    const handleLogin = async (event: FormEvent) => {
+        event.preventDefault();
         setError('');
         setLoading(true);
 
@@ -22,38 +21,53 @@ export default function AuthPage() {
             const session = await authService.login(email, password);
             const progress = await progressService.getParticipantProgress(
                 session.participant.id,
-                APP_CONFIG.TRAINING_MODULE_ID
+                APP_CONFIG.TRAINING_MODULE_ID,
             ).catch((progressError: unknown) => {
                 console.warn('No se pudo recuperar el progreso después del login:', progressError);
                 return null;
             });
+
             if (!session.participant.avatarId) {
                 navigate('/avatar-selector');
-            } else if (progress?.status === 'approved' || progress?.status === 'failed') {
-                navigate('/evaluation');
             } else {
-                navigate('/training');
+                navigate(`/campus/${progress?.lastLocation.zoneId ?? 'lobby'}`);
             }
-        } catch (error: unknown) {
-            setError(getErrorMessage(error, 'Credenciales inválidas.'));
+        } catch (requestError: unknown) {
+            setError(getErrorMessage(requestError, 'Credenciales inválidas.'));
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div style={{ padding: '2rem', maxWidth: '400px', margin: '0 auto' }}>
-            <h2>Iniciar Sesión</h2>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
+        <main style={{ padding: '2rem', maxWidth: '400px', margin: '0 auto' }}>
+            <h1 style={{ fontSize: '1.75rem' }}>Iniciar sesión</h1>
+            {error && <p role="alert" style={{ color: '#b91c1c' }}>{error}</p>}
 
             <form onSubmit={handleLogin}>
                 <div style={{ marginBottom: '1rem' }}>
-                    <label>Correo Electrónico:</label>
-                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={{ width: '100%', padding: '0.5rem' }} />
+                    <label htmlFor="login-email">Correo electrónico:</label>
+                    <input
+                        id="login-email"
+                        autoComplete="email"
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        required
+                        style={{ width: '100%', padding: '0.5rem' }}
+                    />
                 </div>
                 <div style={{ marginBottom: '1rem' }}>
-                    <label>Contraseña:</label>
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={{ width: '100%', padding: '0.5rem' }} />
+                    <label htmlFor="login-password">Contraseña:</label>
+                    <input
+                        id="login-password"
+                        autoComplete="current-password"
+                        type="password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        required
+                        style={{ width: '100%', padding: '0.5rem' }}
+                    />
                 </div>
                 <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.75rem', cursor: 'pointer' }}>
                     {loading ? 'Ingresando...' : 'Ingresar'}
@@ -62,6 +76,6 @@ export default function AuthPage() {
             <p style={{ marginTop: '1rem' }}>
                 ¿No tienes cuenta? <Link to="/register">Regístrate aquí</Link>
             </p>
-        </div>
+        </main>
     );
 }

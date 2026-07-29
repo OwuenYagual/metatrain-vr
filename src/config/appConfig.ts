@@ -3,10 +3,18 @@ import {
     TRAINING_MODULE_ID,
     TRAINING_STATIONS,
 } from '../../shared/trainingModule';
+import {
+    CAMPUS_WORLD_ID,
+    CAMPUS_WORLD_VERSION,
+    TRAINING_MODULE_VERSION,
+} from '../../shared/campus';
 
 export const APP_CONFIG = {
-    API_URL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+    API_URL: import.meta.env?.VITE_API_URL || 'http://localhost:3000/api',
     TRAINING_MODULE_ID,
+    TRAINING_MODULE_VERSION,
+    CAMPUS_WORLD_ID,
+    CAMPUS_WORLD_VERSION,
     MIN_PASSING_SCORE,
     AUTOSAVE_INTERVAL_MS: 15_000,
     TARGET_FPS: 60,

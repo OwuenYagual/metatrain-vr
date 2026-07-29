@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 type RateLimitOptions = {
     windowMs: number;
     maxRequests: number;
+    key?: (req: Request) => string;
 };
 
 type Bucket = {
@@ -10,7 +11,7 @@ type Bucket = {
     resetAt: number;
 };
 
-export function createRateLimit({ windowMs, maxRequests }: RateLimitOptions) {
+export function createRateLimit({ windowMs, maxRequests, key: resolveKey }: RateLimitOptions) {
     const buckets = new Map<string, Bucket>();
 
     return (req: Request, res: Response, next: NextFunction): void => {
@@ -20,7 +21,7 @@ export function createRateLimit({ windowMs, maxRequests }: RateLimitOptions) {
                 if (bucket.resetAt <= now) buckets.delete(bucketKey);
             }
         }
-        const key = req.ip || req.socket.remoteAddress || 'unknown';
+        const key = resolveKey?.(req) || req.ip || req.socket.remoteAddress || 'unknown';
         const current = buckets.get(key);
 
         if (!current || current.resetAt <= now) {

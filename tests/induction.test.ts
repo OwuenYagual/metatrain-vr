@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
     INDUCTION_ACTIVITIES,
     isChecklistSelectionCorrect,
-} from '../src/induction/inductionActivities';
+} from '../shared/inductionActivities';
 import {
     buildNpcSpeechBubbles,
     getNpcSpeechRevealInterval,

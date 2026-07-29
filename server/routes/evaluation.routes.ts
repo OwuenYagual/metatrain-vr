@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import { CAMPUS_MANIFEST, getCampusZone } from '../../shared/campus';
 import EvaluationResult, { type IEvaluationResult } from '../models/evaluation.model';
 import Question from '../models/question.model';
 import TrainingContent from '../models/content.model';
@@ -17,6 +18,7 @@ import {
     MIN_PASSING_SCORE,
 } from '../../shared/trainingModule';
 import { getCompletedSimulationDecisionIds, SIMULATION_DECISION_IDS } from '../domain/simulation';
+import { progressIdentityFilter } from '../domain/campusAccess';
 
 const router = Router();
 const evaluationSubmitRateLimit = createRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 });
@@ -65,7 +67,7 @@ async function getEligibleProgress(
         return null;
     }
 
-    const progress = await TrainingProgress.findOne({ participantId, moduleId });
+    const progress = await TrainingProgress.findOne(progressIdentityFilter(participantId, moduleId));
     const hasPreviousEvaluation = Boolean(await EvaluationResult.exists({ participantId, moduleId }));
     const requiredSimulationDecisionIds = hasPreviousEvaluation ? [] : SIMULATION_DECISION_IDS;
     const requirements = summarizeEvaluationRequirements({
@@ -145,6 +147,21 @@ router.post('/:moduleId/submit', evaluationSubmitRateLimit, async (req: Request,
             res.status(400).json({ error: submission.error });
             return;
         }
+        const input = req.body as Record<string, unknown>;
+        const moduleVersion = input.moduleVersion ?? CAMPUS_MANIFEST.moduleVersion;
+        const worldVersion = input.worldVersion ?? CAMPUS_MANIFEST.worldVersion;
+        const zoneId = input.zoneId ?? 'assessment-room';
+        const durationSeconds = input.durationSeconds ?? 0;
+        if (moduleVersion !== CAMPUS_MANIFEST.moduleVersion
+            || worldVersion !== CAMPUS_MANIFEST.worldVersion
+            || zoneId !== 'assessment-room') {
+            res.status(409).json({ error: 'La evaluación no pertenece al mundo, módulo o zona activos.' });
+            return;
+        }
+        if (!Number.isInteger(durationSeconds) || Number(durationSeconds) < 0) {
+            res.status(400).json({ error: 'durationSeconds no es válido.' });
+            return;
+        }
 
         const progress = await getEligibleProgress(req.auth!.id, moduleId, res);
         if (!progress) return;
@@ -174,10 +191,56 @@ router.post('/:moduleId/submit', evaluationSubmitRateLimit, async (req: Request,
             ...scoreResult.value,
         });
         try {
-            progress.score = scoreResult.value.score;
-            progress.status = scoreResult.value.status;
-            progress.lastSavedAt = new Date();
-            await progress.save();
+            const now = new Date();
+            const zone = getCampusZone('assessment-room');
+            const updatedProgress = await TrainingProgress.findOneAndUpdate(
+                {
+                    _id: progress._id,
+                    ...(scoreResult.value.status === 'failed' ? { status: { $ne: 'approved' } } : {}),
+                },
+                {
+                    $set: {
+                        moduleVersion: CAMPUS_MANIFEST.moduleVersion,
+                        worldVersion: CAMPUS_MANIFEST.worldVersion,
+                        ...(scoreResult.value.status === 'failed'
+                            ? { score: scoreResult.value.score }
+                            : {}),
+                        status: scoreResult.value.status,
+                        lastLocation: {
+                            worldId: CAMPUS_MANIFEST.worldId,
+                            worldVersion: CAMPUS_MANIFEST.worldVersion,
+                            zoneId: zone.id,
+                            spawnId: zone.defaultSpawnId,
+                            savedAt: now,
+                        },
+                        lastSavedAt: now,
+                    },
+                    $max: {
+                        durationSeconds: Number(durationSeconds),
+                        ...(scoreResult.value.status === 'approved'
+                            ? { score: scoreResult.value.score }
+                            : {}),
+                    },
+                },
+                { new: true, runValidators: true },
+            );
+            if (!updatedProgress) {
+                const current = await TrainingProgress.findById(progress._id);
+                if (current?.status === 'approved' && scoreResult.value.status === 'failed') {
+                    await EvaluationResult.deleteOne({ _id: result._id });
+                    const approvedResult = await EvaluationResult.findOne({
+                        participantId: req.auth!.id,
+                        moduleId,
+                        status: 'approved',
+                    }).sort({ score: -1, createdAt: -1, _id: -1 });
+                    if (!approvedResult) throw new Error('APPROVED_RESULT_NOT_FOUND');
+                    res.json({ result: evaluationSummary(approvedResult) });
+                    return;
+                }
+                if (!current || current.status !== 'approved') {
+                    throw new Error('PROGRESS_CONCURRENTLY_CHANGED');
+                }
+            }
         } catch (error: unknown) {
             await EvaluationResult.deleteOne({ _id: result._id });
             throw error;

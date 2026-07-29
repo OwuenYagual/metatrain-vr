@@ -1,4 +1,4 @@
-import type { InductionActivity } from './inductionActivities';
+import type { InductionActivity } from '../../shared/inductionActivities';
 
 export const NPC_SPEECH_SPEED_OPTIONS = [
     { value: 'slow', label: 'Lenta', intervalMs: 40 },
@@ -31,6 +31,7 @@ export type NpcSpeechBubble = {
 export type ActiveNpcSpeech = {
     stationId: string;
     bubbleId: string;
+    nextBubbleId?: string;
     kind: NpcSpeechBubble['kind'];
     label: string;
     visibleText: string;

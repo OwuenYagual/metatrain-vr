@@ -1,10 +1,16 @@
 import { readRequiredString } from '../utils/validation';
+import { CAMPUS_MANIFEST } from '../../shared/campus';
 
 type ValidationResult<T> =
     | { ok: true; value: T }
     | { ok: false; error: string };
 
 export type SimulationDecisionInput = {
+    clientEventId?: string;
+    moduleVersion: number;
+    worldVersion: number;
+    zoneId: 'simulation-lab';
+    durationSeconds: number;
     scenarioId: string;
     decisionId: string;
     selectedOptionId: string;
@@ -109,9 +115,36 @@ export function validateSimulationDecisionInput(body: unknown): ValidationResult
     if (!scenarioId.ok) return scenarioId;
     if (!decisionId.ok) return decisionId;
     if (!selectedOptionId.ok) return selectedOptionId;
+    let clientEventId: string | undefined;
+    if (input.clientEventId !== undefined) {
+        const eventId = readRequiredString(input.clientEventId, 'clientEventId', 100);
+        if (!eventId.ok) return eventId;
+        clientEventId = eventId.value;
+    }
+    const moduleVersion = input.moduleVersion ?? CAMPUS_MANIFEST.moduleVersion;
+    const worldVersion = input.worldVersion ?? CAMPUS_MANIFEST.worldVersion;
+    const zoneId = input.zoneId ?? 'simulation-lab';
+    const durationSeconds = input.durationSeconds ?? 0;
+    if (!Number.isInteger(moduleVersion) || Number(moduleVersion) < 1) {
+        return { ok: false, error: 'moduleVersion debe ser un entero positivo.' };
+    }
+    if (!Number.isInteger(worldVersion) || Number(worldVersion) < 1) {
+        return { ok: false, error: 'worldVersion debe ser un entero positivo.' };
+    }
+    if (zoneId !== 'simulation-lab') {
+        return { ok: false, error: 'La decisión no pertenece a la zona indicada.' };
+    }
+    if (!Number.isInteger(durationSeconds) || Number(durationSeconds) < 0) {
+        return { ok: false, error: 'durationSeconds no es válido.' };
+    }
     return {
         ok: true,
         value: {
+            clientEventId,
+            moduleVersion: Number(moduleVersion),
+            worldVersion: Number(worldVersion),
+            zoneId,
+            durationSeconds: Number(durationSeconds),
             scenarioId: scenarioId.value,
             decisionId: decisionId.value,
             selectedOptionId: selectedOptionId.value,
