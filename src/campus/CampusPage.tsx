@@ -198,6 +198,11 @@ export default function CampusPage() {
     useEffect(() => {
         if (!session?.participant.avatarId || !session.participant.id) {
             navigate('/avatar-selector', { replace: true });
+        }
+    }, [navigate, session?.participant.avatarId, session?.participant.id]);
+
+    useEffect(() => {
+        if (!session?.participant.avatarId || !session.participant.id) {
             return undefined;
         }
         const controller = new AbortController();
@@ -232,7 +237,6 @@ export default function CampusPage() {
             });
         return () => controller.abort();
     }, [
-        navigate,
         session?.participant.avatarId,
         session?.participant.id,
         setActiveContent,

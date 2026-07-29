@@ -399,6 +399,51 @@ test('redirige una zona bloqueada a la última ubicación permitida', async ({ p
         .getByText(/Laboratorio de simulaci/i)).toBeVisible();
 });
 
+test('entra al laboratorio desde la puerta central del vestíbulo', async ({ page }) => {
+    await installSession(page, 'avatar_01');
+    await mockApi(page, {
+        avatarId: 'avatar_01',
+        completedContents: contents.map((content) => content._id),
+        lastLocation: { zoneId: 'lobby', spawnId: 'from-simulation' },
+    });
+    await page.goto('/campus/lobby');
+
+    const canvas = page.locator('[aria-label="Campus 3D: lobby"] canvas');
+    const laboratoryPrompt = page.getByRole('button', {
+        name: /Interactuar con Laboratorio de simulaci/i,
+    });
+    await expect(canvas).toBeVisible();
+    await page.waitForTimeout(1_200);
+    await canvas.focus();
+    await page.keyboard.down('Shift');
+    try {
+        await page.keyboard.down('s');
+        await page.waitForTimeout(1_000);
+        await page.keyboard.up('s');
+    } finally {
+        await page.keyboard.up('s');
+        await page.keyboard.up('Shift');
+    }
+    if (!await laboratoryPrompt.isVisible()) {
+        await page.keyboard.down('Shift');
+        await page.keyboard.down('s');
+        await page.waitForTimeout(1_000);
+        await page.keyboard.up('s');
+        await page.keyboard.up('Shift');
+    }
+    if (!await laboratoryPrompt.isVisible()) {
+        await page.keyboard.press('s');
+    }
+    await expect(laboratoryPrompt).toBeVisible();
+
+    await laboratoryPrompt.click();
+
+    await expect(page).toHaveURL(/\/campus\/simulation-lab$/);
+    await expect(page.locator('[aria-label="Campus 3D: simulation-lab"] canvas')).toBeVisible();
+    await page.waitForTimeout(1_200);
+    await expect(page).toHaveURL(/\/campus\/simulation-lab$/);
+});
+
 test('mantiene desarmado el portal inverso al aparecer en el laboratorio', async ({ page }) => {
     await installSession(page, 'avatar_01');
     await mockApi(page, {
