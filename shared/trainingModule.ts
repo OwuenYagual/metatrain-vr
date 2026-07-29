@@ -1,32 +1,78 @@
 export const TRAINING_MODULE_ID = 'induccion_001';
+export const TRAINING_MODULE_TITLE = 'Inducción Corporativa';
 export const MIN_PASSING_SCORE = 70;
 
 export const TRAINING_STATIONS = [
-    { position: [-2.5, -0.5, -1], id: 'obj_manual', title: 'Políticas de la Empresa', variant: 'manual' },
-    { position: [2.5, -0.5, -1.5], id: 'obj_rrhh', title: 'Recursos Humanos', variant: 'folder' },
-    { position: [-1.5, -0.5, 2], id: 'obj_funciones', title: 'Funciones de tu Rol', variant: 'board' },
-    { position: [0, -0.5, -2.7], id: 'obj_seguridad', title: 'Seguridad Laboral', variant: 'shield' },
-    { position: [1.5, -0.5, 2.5], id: 'obj_examen', title: 'Evaluación Final', variant: 'terminal' },
-] as const;
-
-export const TRAINING_CHECKPOINTS = [
-    { id: 'cp_entrada', label: 'Inicio del recorrido', position: [0, 0.6, -3.2] },
-    { id: 'cp_politicas', label: 'Zona de políticas', position: [2.2, 0.4, -2] },
-    { id: 'cp_seguridad', label: 'Zona de seguridad', position: [-0.7, 1.1, -0.6] },
-    { id: 'cp_cierre', label: 'Cierre del recorrido', position: [0.8, 2, 0.6] },
+    {
+        position: [-3.25, -0.45, -1.25],
+        id: 'obj_manual',
+        title: 'Políticas y convivencia',
+        variant: 'manual',
+        guide: { name: 'Sofía Andrade', role: 'Guía de Talento Humano', color: '#4f46e5' },
+    },
+    {
+        position: [0, -0.45, -3.1],
+        id: 'obj_rrhh',
+        title: 'Departamentos y personas',
+        variant: 'folder',
+        guide: { name: 'Elena Torres', role: 'Guía de la organización', color: '#0f766e' },
+    },
+    {
+        position: [3.25, -0.45, -1.25],
+        id: 'obj_funciones',
+        title: 'Funciones de tu puesto',
+        variant: 'board',
+        guide: { name: 'Carlos Méndez', role: 'Supervisor de Operaciones', color: '#b45309' },
+    },
+    {
+        position: [3.1, -0.45, 2.25],
+        id: 'obj_seguridad',
+        title: 'Red de apoyo',
+        variant: 'shield',
+        guide: { name: 'Valeria León', role: 'Guía de Seguridad y Salud', color: '#be123c' },
+    },
+    {
+        position: [-3.1, -0.45, 2.25],
+        id: 'obj_examen',
+        title: 'Reto del primer día',
+        variant: 'terminal',
+        guide: { name: 'Diego Ruiz', role: 'Mentor de integración', color: '#0369a1' },
+    },
 ] as const;
 
 export const TRAINING_INTERACTION_OBJECT_IDS = TRAINING_STATIONS.map((station) => station.id);
-export const TRAINING_CHECKPOINT_IDS = TRAINING_CHECKPOINTS.map((checkpoint) => checkpoint.id);
 
 export function getModuleInteractionObjectIds(moduleId: string): readonly string[] | null {
     return moduleId === TRAINING_MODULE_ID ? TRAINING_INTERACTION_OBJECT_IDS : null;
 }
 
-export function getModuleCheckpointIds(moduleId: string): readonly string[] | null {
-    return moduleId === TRAINING_MODULE_ID ? TRAINING_CHECKPOINT_IDS : null;
+export function getPreviousTrainingStationId(stationId: string): string | null {
+    const stationIndex = TRAINING_INTERACTION_OBJECT_IDS.indexOf(
+        stationId as (typeof TRAINING_INTERACTION_OBJECT_IDS)[number],
+    );
+    if (stationIndex <= 0) return null;
+    return TRAINING_INTERACTION_OBJECT_IDS[stationIndex - 1] ?? null;
 }
 
-export function getNextTrainingCheckpointId(visitedCheckpointIds: readonly string[]): string | null {
-    return TRAINING_CHECKPOINT_IDS.find((checkpointId) => !visitedCheckpointIds.includes(checkpointId)) ?? null;
+export function isTrainingStationUnlocked(
+    stationId: string,
+    completedStationIds: readonly string[],
+): boolean {
+    const stationIndex = TRAINING_INTERACTION_OBJECT_IDS.indexOf(
+        stationId as (typeof TRAINING_INTERACTION_OBJECT_IDS)[number],
+    );
+    if (stationIndex < 0) return false;
+    if (stationIndex === 0) return true;
+    return completedStationIds.includes(TRAINING_INTERACTION_OBJECT_IDS[stationIndex - 1]);
+}
+
+export function getCompletedTrainingRouteSegmentCount(
+    completedStationIds: readonly string[],
+): number {
+    let completedSegments = 0;
+    for (let index = 0; index < TRAINING_INTERACTION_OBJECT_IDS.length - 1; index += 1) {
+        if (!completedStationIds.includes(TRAINING_INTERACTION_OBJECT_IDS[index])) break;
+        completedSegments += 1;
+    }
+    return completedSegments;
 }

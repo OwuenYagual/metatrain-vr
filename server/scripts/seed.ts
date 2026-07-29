@@ -7,23 +7,25 @@ import { TRAINING_MODULE_ID } from '../../shared/trainingModule';
 const moduleId = TRAINING_MODULE_ID;
 
 const contents = [
-    { interactionObjectId: 'obj_manual', title: 'Políticas de la Empresa', body: 'Conoce las políticas generales, los canales internos y las normas básicas de convivencia.', order: 1 },
-    { interactionObjectId: 'obj_rrhh', title: 'Departamento de Recursos Humanos', body: 'Identifica los servicios, beneficios y canales de atención de Recursos Humanos.', order: 2 },
-    { interactionObjectId: 'obj_funciones', title: 'Funciones de tu Rol', body: 'Revisa las responsabilidades, resultados esperados y canales de escalamiento de tu rol.', order: 3 },
-    { interactionObjectId: 'obj_seguridad', title: 'Seguridad Laboral', body: 'Aplica las medidas preventivas y reconoce cómo reportar un incidente de seguridad.', order: 4 },
-    { interactionObjectId: 'obj_examen', title: 'Preparación para la Evaluación', body: 'Confirma los requisitos de avance antes de iniciar la evaluación del módulo.', order: 5 },
+    { interactionObjectId: 'obj_manual', title: 'Políticas y convivencia', body: 'Practica confidencialidad, respeto y uso responsable de los recursos corporativos.', order: 1 },
+    { interactionObjectId: 'obj_rrhh', title: 'Departamentos y personas', body: 'Explora el organigrama, las personas de referencia y los canales de cada departamento.', order: 2 },
+    { interactionObjectId: 'obj_funciones', title: 'Funciones de tu puesto', body: 'Organiza las responsabilidades del Analista de Operaciones durante una jornada.', order: 3 },
+    { interactionObjectId: 'obj_seguridad', title: 'Red de apoyo', body: 'Identifica el departamento correcto para resolver necesidades laborales, técnicas y de seguridad.', order: 4 },
+    { interactionObjectId: 'obj_examen', title: 'Reto del primer día', body: 'Construye una tarjeta práctica con las funciones que aplicarás en tu puesto.', order: 5 },
 ];
 
 const questions = [
-    ['¿Dónde se consultan las políticas internas?', ['En los canales corporativos', 'Solo con clientes'], 'a'],
-    ['¿Qué área gestiona beneficios y acompañamiento laboral?', ['Ventas', 'Recursos Humanos'], 'b'],
-    ['¿Qué debe hacerse ante un incidente de seguridad?', ['Reportarlo por el canal definido', 'Ignorarlo'], 'a'],
-    ['¿Cuál es el propósito de revisar las funciones del rol?', ['Conocer responsabilidades y resultados', 'Evitar la coordinación'], 'a'],
-    ['¿Qué se requiere antes de la evaluación?', ['Completar el recorrido y los contenidos', 'Cerrar la sesión'], 'a'],
+    ['¿Dónde debe manejarse la información interna?', ['En herramientas corporativas autorizadas', 'En correos y carpetas personales'], 'a'],
+    ['¿Qué departamento acompaña beneficios y convivencia laboral?', ['Talento Humano', 'Tecnología'], 'a'],
+    ['¿Quién gestiona accesos, equipos y aplicaciones?', ['Dirección General', 'Tecnología'], 'b'],
+    ['¿Cuál es la primera acción del Analista de Operaciones al iniciar la jornada?', ['Revisar prioridades, plazos y responsables', 'Modificar el proceso sin autorización'], 'a'],
+    ['¿Qué debe hacer el empleado cuando encuentra un bloqueo?', ['Ocultarlo hasta terminar la jornada', 'Comunicarlo al supervisor y proponer el siguiente paso'], 'b'],
 ] as const;
 
 async function seed() {
     await mongoose.connect(env.mongoUri);
+
+    await Question.updateMany({ moduleId }, { $set: { active: false } });
 
     for (const content of contents) {
         await TrainingContent.findOneAndUpdate(

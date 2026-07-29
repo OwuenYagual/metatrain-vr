@@ -1,7 +1,7 @@
 import { Component, Suspense, useEffect, useMemo, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Bounds, OrbitControls, useGLTF } from '@react-three/drei';
+import { Bounds, OrbitControls, useAnimations, useGLTF } from '@react-three/drei';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, getErrorMessage } from '../api/apiClient';
 import { authService, type AvatarId, type Participant } from '../auth/authService';
@@ -26,8 +26,19 @@ function isAvatarOption(value: unknown): value is AvatarOption {
 }
 
 function AvatarModel({ modelUrl }: { modelUrl: string }) {
-    const { scene } = useGLTF(modelUrl);
+    const { animations, scene } = useGLTF(modelUrl);
     const model = useMemo(() => scene.clone(true), [scene]);
+
+    const { actions } = useAnimations(animations, model);
+
+    useEffect(() => {
+        const idleAction = actions.Idle;
+        idleAction?.reset().fadeIn(0.2).play();
+        return () => {
+            idleAction?.fadeOut(0.2);
+        };
+    }, [actions]);
+
     return <primitive object={model} />;
 }
 
@@ -119,7 +130,7 @@ export default function AvatarSelector() {
             });
             const result = await response.json() as AvatarResponse;
             authService.updateParticipant(result.participant);
-            navigate('/training');
+            navigate('/campus/lobby');
         } catch (requestError: unknown) {
             setError(getErrorMessage(requestError, 'Hubo un problema guardando el avatar.'));
         } finally {

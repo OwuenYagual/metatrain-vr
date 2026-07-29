@@ -8,23 +8,23 @@ export type AvatarOption = {
     modelUrl: string;
 };
 
-const THREE_MODELS_BASE_URL = 'https://threejs.org/examples/models/gltf';
+const LOCAL_AVATAR_BASE_URL = '/models/avatars';
 
 export const AVAILABLE_AVATARS: readonly AvatarOption[] = Object.freeze([
     {
         id: 'avatar_01',
-        label: 'Avatar Profesional Alex',
-        modelUrl: `${THREE_MODELS_BASE_URL}/readyplayer.me.glb`,
+        label: 'Avatar corporativo A',
+        modelUrl: `${LOCAL_AVATAR_BASE_URL}/avatar_01.glb`,
     },
     {
         id: 'avatar_02',
-        label: 'Avatar Profesional Michelle',
-        modelUrl: `${THREE_MODELS_BASE_URL}/Michelle.glb`,
+        label: 'Avatar corporativo B',
+        modelUrl: `${LOCAL_AVATAR_BASE_URL}/avatar_02.glb`,
     },
     {
         id: 'avatar_03',
-        label: 'Avatar Profesional X-Bot',
-        modelUrl: `${THREE_MODELS_BASE_URL}/Xbot.glb`,
+        label: 'Avatar corporativo C',
+        modelUrl: `${LOCAL_AVATAR_BASE_URL}/avatar_03.glb`,
     },
 ]);
 

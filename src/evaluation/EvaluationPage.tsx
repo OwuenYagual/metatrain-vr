@@ -9,17 +9,32 @@ import {
     type EvaluationQuestion,
     type EvaluationResult,
 } from './evaluationService';
+import {
+    certificateService,
+    type CertificateSummary,
+} from '../certificate/certificateService';
+import { useVoiceAnswer } from '../speech/useVoiceAnswer';
+import './EvaluationPage.css';
 
-export default function EvaluationPage() {
+const ignoreMicrophoneState = () => undefined;
+
+export default function EvaluationPage({
+    onMicrophoneActiveChange = ignoreMicrophoneState,
+}: {
+    onMicrophoneActiveChange?: (active: boolean) => void;
+}) {
     const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [result, setResult] = useState<EvaluationResult | null>(null);
+    const [certificate, setCertificate] = useState<CertificateSummary | null>(null);
     const [passingScore, setPassingScore] = useState<number>(APP_CONFIG.MIN_PASSING_SCORE);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [downloadingCertificate, setDownloadingCertificate] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
     const session = authService.getCurrentSession();
+    const voice = useVoiceAnswer(onMicrophoneActiveChange);
     const answeredCount = useMemo(
         () => questions.filter((question) => Boolean(answers[question.id])).length,
         [answers, questions],
@@ -30,11 +45,13 @@ export default function EvaluationPage() {
         Promise.all([
             evaluationService.getQuestions(APP_CONFIG.TRAINING_MODULE_ID, controller.signal),
             evaluationService.getLatestResult(APP_CONFIG.TRAINING_MODULE_ID, controller.signal),
+            certificateService.getCertificate(APP_CONFIG.TRAINING_MODULE_ID, controller.signal),
         ])
-            .then(([evaluation, latestResult]) => {
+            .then(([evaluation, latestResult, savedCertificate]) => {
                 setQuestions(evaluation.questions);
                 setPassingScore(evaluation.passingScore);
                 setResult(latestResult);
+                setCertificate(savedCertificate);
             })
             .catch((requestError: unknown) => {
                 if (!controller.signal.aborted) {
@@ -70,9 +87,32 @@ export default function EvaluationPage() {
     };
 
     const retryEvaluation = () => {
+        voice.cancel();
         setAnswers({});
         setResult(null);
         setError('');
+    };
+
+    const downloadCertificate = async () => {
+        setDownloadingCertificate(true);
+        setError('');
+        try {
+            const issuedCertificate = await certificateService.issueCertificate(APP_CONFIG.TRAINING_MODULE_ID);
+            const pdf = await certificateService.downloadCertificate(APP_CONFIG.TRAINING_MODULE_ID);
+            const objectUrl = URL.createObjectURL(pdf);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = 'certificado-metatrain.pdf';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+            setCertificate(issuedCertificate);
+        } catch (requestError: unknown) {
+            setError(getErrorMessage(requestError, 'No se pudo descargar el certificado.'));
+        } finally {
+            setDownloadingCertificate(false);
+        }
     };
 
     const logout = () => {
@@ -124,6 +164,29 @@ export default function EvaluationPage() {
                             Respondiste correctamente {result.correctAnswers} de {result.totalQuestions} preguntas.
                             La nota mínima es {passingScore}%.
                         </p>
+                        {result.status === 'approved' && APP_CONFIG.CERTIFICATE_ENABLED && (
+                            <section aria-labelledby="certificate-title" style={{ marginTop: '1.25rem', padding: '1rem', background: '#eff6ff', color: '#1e3a8a', borderRadius: 10 }}>
+                                <h3 id="certificate-title" style={{ margin: '0 0 0.5rem' }}>Certificado de aprobación</h3>
+                                <p>El certificado incluye tu nombre, nota, fecha de emisión y un código único de verificación.</p>
+                                {certificate && (
+                                    <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', overflowWrap: 'anywhere' }}>
+                                        Código: {certificate.certificateId}
+                                    </p>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => void downloadCertificate()}
+                                    disabled={downloadingCertificate}
+                                    style={{ marginTop: '0.8rem', padding: '0.75rem 1rem', background: '#1d4ed8', color: '#fff', border: 0, borderRadius: 8, fontWeight: 700 }}
+                                >
+                                    {downloadingCertificate
+                                        ? 'Preparando certificado...'
+                                        : certificate
+                                            ? 'Descargar certificado nuevamente'
+                                            : 'Emitir y descargar certificado'}
+                                </button>
+                            </section>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.5rem' }}>
                             {result.status === 'failed' && (
                                 <button type="button" onClick={retryEvaluation} style={{ padding: '0.75rem 1rem', background: '#2563eb', color: '#fff', border: 0, borderRadius: 8, fontWeight: 700 }}>
@@ -137,8 +200,14 @@ export default function EvaluationPage() {
                 {!loading && !result && questions.length > 0 && (
                     <form onSubmit={submitEvaluation}>
                         <p id="evaluation-instructions" style={{ padding: '0.85rem', background: '#eff6ff', color: '#1e40af', borderRadius: 8 }}>
-                            Selecciona una respuesta por pregunta. Necesitas {passingScore}% para aprobar.
+                            Selecciona una respuesta por pregunta. También puedes mantener pulsado el micrófono,
+                            decir el número o el texto de una opción y confirmarla. Necesitas {passingScore}% para aprobar.
                         </p>
+                        {voice.capabilities && !voice.capabilities.transcriptionAvailable && (
+                            <p role="status" className="voice-answer-unavailable">
+                                Las respuestas por voz no están configuradas. Los controles manuales siguen disponibles.
+                            </p>
+                        )}
                         <p aria-live="polite" style={{ margin: '1rem 0', fontWeight: 700 }}>
                             {answeredCount} de {questions.length} respondidas
                         </p>
@@ -156,11 +225,90 @@ export default function EvaluationPage() {
                                                     name={`question-${question.id}`}
                                                     value={option.id}
                                                     checked={answers[question.id] === option.id}
-                                                    onChange={() => setAnswers((current) => ({ ...current, [question.id]: option.id }))}
+                                                    onChange={() => {
+                                                        if (voice.activeQuestionId === question.id) voice.cancel();
+                                                        setAnswers((current) => ({ ...current, [question.id]: option.id }));
+                                                    }}
                                                 />
                                                 <span>{option.text}</span>
                                             </label>
                                         ))}
+                                    </div>
+                                    <div className="voice-answer-controls">
+                                        <button
+                                            type="button"
+                                            className={voice.activeQuestionId === question.id && voice.status === 'listening' ? 'is-listening' : ''}
+                                            disabled={submitting
+                                                || voice.capabilities?.transcriptionAvailable === false
+                                                || (voice.activeQuestionId !== null
+                                                    && voice.activeQuestionId !== question.id
+                                                    && ['requesting', 'listening', 'processing'].includes(voice.status))}
+                                            aria-label={`Mantener para responder por voz la pregunta ${questionIndex + 1}`}
+                                            onPointerDown={(event) => {
+                                                event.preventDefault();
+                                                event.currentTarget.setPointerCapture(event.pointerId);
+                                                void voice.begin(question);
+                                            }}
+                                            onPointerUp={(event) => {
+                                                event.preventDefault();
+                                                voice.end();
+                                            }}
+                                            onPointerCancel={voice.end}
+                                            onKeyDown={(event) => {
+                                                if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+                                                    event.preventDefault();
+                                                    void voice.begin(question);
+                                                }
+                                            }}
+                                            onKeyUp={(event) => {
+                                                if (event.key === ' ' || event.key === 'Enter') {
+                                                    event.preventDefault();
+                                                    voice.end();
+                                                }
+                                            }}
+                                        >
+                                            {voice.activeQuestionId === question.id && voice.status === 'requesting'
+                                                ? 'Permitiendo micrófono…'
+                                                : voice.activeQuestionId === question.id && voice.status === 'listening'
+                                                    ? 'Escuchando… suelta para enviar'
+                                                    : voice.activeQuestionId === question.id && voice.status === 'processing'
+                                                        ? 'Reconociendo respuesta…'
+                                                        : 'Mantener para responder'}
+                                        </button>
+
+                                        {voice.activeQuestionId === question.id && voice.status === 'error' && (
+                                            <div role="alert" className="voice-answer-feedback is-error">
+                                                <p>{voice.error}</p>
+                                                <button type="button" onClick={voice.cancel}>Cerrar</button>
+                                            </div>
+                                        )}
+
+                                        {voice.activeQuestionId === question.id && voice.proposal && (
+                                            <div role="status" aria-live="polite" className="voice-answer-feedback">
+                                                <p><strong>Se entendió:</strong> “{voice.proposal.transcript}”</p>
+                                                {voice.proposal.status === 'matched' && voice.proposal.optionId ? (
+                                                    <p>
+                                                        <strong>Opción propuesta:</strong>{' '}
+                                                        {question.options.find(({ id }) => id === voice.proposal?.optionId)?.text}
+                                                    </p>
+                                                ) : (
+                                                    <p>No hay una coincidencia clara. Di “opción uno”, “opción dos” o lee una respuesta.</p>
+                                                )}
+                                                <div>
+                                                    {voice.proposal.status === 'matched' && voice.proposal.optionId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => voice.confirm((questionId, optionId) => {
+                                                                setAnswers((current) => ({ ...current, [questionId]: optionId }));
+                                                            })}
+                                                        >
+                                                            Confirmar opción
+                                                        </button>
+                                                    )}
+                                                    <button type="button" onClick={voice.cancel}>Cancelar o reintentar</button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </fieldset>
                             ))}

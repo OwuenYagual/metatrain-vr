@@ -1,0 +1,336 @@
+.simulation-page {
+    min-height: 100vh;
+    width: 100%;
+    box-sizing: border-box;
+    background: linear-gradient(145deg, #e8eef6 0%, #f8fafc 55%, #e0e7ff 100%);
+    padding: clamp(1rem, 3vw, 2rem);
+    color: #172033;
+    text-align: left;
+}
+
+.simulation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    width: min(1180px, 100%);
+    margin: 0 auto 1.25rem;
+}
+
+.simulation-header p,
+.simulation-eyebrow {
+    margin: 0 0 0.3rem;
+    color: #4f46e5;
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.simulation-header h1 {
+    margin: 0 0 0.25rem;
+    font-size: clamp(1.8rem, 4vw, 3rem);
+}
+
+.simulation-header-actions {
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.simulation-header-actions button {
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 0.65rem 0.8rem;
+    color: #334155;
+    cursor: pointer;
+}
+
+.simulation-workspace {
+    display: grid;
+    grid-template-columns: minmax(300px, 0.8fr) minmax(420px, 1.2fr);
+    gap: 1rem;
+    width: min(1180px, 100%);
+    margin: 0 auto;
+}
+
+.first-day-map,
+.decision-workbench {
+    border: 1px solid rgba(148, 163, 184, 0.5);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+    padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.first-day-map h2,
+.decision-workbench h2 {
+    margin: 0 0 0.5rem;
+}
+
+.first-day-map > div:first-child > p:last-child {
+    color: #475569;
+    line-height: 1.55;
+}
+
+.office-zones {
+    position: relative;
+    display: grid;
+    gap: 0.7rem;
+    margin: 1.25rem 0;
+}
+
+.office-zones::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    top: 1rem;
+    bottom: 1rem;
+    left: 1.45rem;
+    width: 2px;
+    background: #cbd5e1;
+}
+
+.office-zone {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.7rem;
+    align-items: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 13px;
+    background: #f8fafc;
+    padding: 0.75rem;
+    color: #64748b;
+}
+
+.office-zone.is-active {
+    border-color: #4f46e5;
+    background: #eef2ff;
+    color: #3730a3;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.office-zone.is-completed {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.office-zone-icon {
+    display: grid;
+    place-items: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    background: #fff;
+}
+
+.office-zone div {
+    display: grid;
+}
+
+.office-zone small {
+    font-size: 0.72rem;
+}
+
+.simulation-progress {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 1rem;
+}
+
+.simulation-progress > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.simulation-progress progress {
+    width: 100%;
+    height: 0.8rem;
+    margin: 0.5rem 0;
+    accent-color: #4f46e5;
+}
+
+.simulation-progress small {
+    color: #64748b;
+}
+
+.decision-workbench {
+    min-height: 520px;
+}
+
+.active-decision > p:not(.simulation-eyebrow),
+.simulation-summary > p,
+.decision-consequence > p:not(.simulation-eyebrow) {
+    color: #475569;
+    line-height: 1.55;
+}
+
+.action-cards {
+    display: grid;
+    gap: 0.7rem;
+    margin: 1.2rem 0;
+}
+
+.action-cards button {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    align-items: center;
+    border: 1px solid #cbd5e1;
+    border-radius: 13px;
+    background: #f8fafc;
+    padding: 0.85rem;
+    color: #1e293b;
+    text-align: left;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.action-cards button span {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9px;
+    background: #e2e8f0;
+    font-weight: 900;
+}
+
+.action-cards button.is-selected {
+    border-color: #4f46e5;
+    background: #eef2ff;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.action-cards button.is-selected span {
+    background: #4338ca;
+    color: #fff;
+}
+
+.execute-action,
+.decision-consequence button,
+.evaluation-button {
+    width: 100%;
+    border: 0;
+    border-radius: 10px;
+    background: #4338ca;
+    padding: 0.85rem;
+    color: #fff;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.execute-action:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+.decision-consequence {
+    display: grid;
+    place-items: start;
+    min-height: 430px;
+    align-content: center;
+    border-radius: 16px;
+    padding: 1.25rem;
+}
+
+.decision-consequence.is-positive {
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.decision-consequence.is-warning {
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.consequence-icon {
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    margin-bottom: 0.8rem;
+    border-radius: 50%;
+    background: currentColor;
+    color: #fff;
+    font-size: 2rem;
+}
+
+.decision-consequence button {
+    margin-top: 1rem;
+    background: #334155;
+}
+
+.decision-log {
+    display: grid;
+    gap: 0.7rem;
+    margin: 1rem 0;
+}
+
+.decision-log article {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.65rem;
+    border-radius: 11px;
+    background: #f8fafc;
+    padding: 0.75rem;
+}
+
+.decision-log article > span {
+    display: grid;
+    place-items: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 50%;
+    background: #dcfce7;
+    color: #166534;
+    font-weight: 900;
+}
+
+.decision-log p {
+    margin-top: 0.2rem;
+    color: #475569;
+}
+
+.evaluation-button {
+    background: #166534;
+}
+
+.simulation-loading,
+.simulation-error {
+    width: min(1180px, 100%);
+    box-sizing: border-box;
+    margin: 2rem auto;
+    border-radius: 12px;
+    background: #fff;
+    padding: 1rem;
+}
+
+.simulation-error {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+@media (max-width: 860px) {
+    .simulation-header,
+    .simulation-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .simulation-header {
+        display: grid;
+    }
+
+    .simulation-header-actions {
+        justify-content: flex-start;
+    }
+
+    .decision-workbench {
+        min-height: auto;
+    }
+}

@@ -3,23 +3,29 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "npm@10.9.0",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.12.0",
+    "npm": ">=10.9.0"
   },
   "scripts": {
     "dev": "vite",
     "dev:frontend": "vite",
     "dev:backend": "tsx watch server/index.ts",
-    "start": "tsx server/index.ts",
-    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.server.json",
-    "build": "tsc -p tsconfig.app.json && tsc -p tsconfig.server.json && vite build",
+    "start": "node --enable-source-maps dist/server/index.js",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.server.json && tsc -p tsconfig.node.json && tsc -p tsconfig.test.json",
+    "build": "npm run typecheck && vite build && npm run build:server",
+    "build:server": "node scripts/build-server.mjs",
     "lint": "eslint .",
-    "test": "tsx --test tests/validation.test.ts tests/progress.test.ts tests/contentProgress.test.ts tests/evaluation.test.ts tests/models.test.ts",
+    "test": "tsx --test \"tests/**/*.test.ts\"",
+    "test:e2e": "playwright test",
+    "assets:normalize-avatars": "node scripts/normalize-avatar-clips.mjs",
     "seed": "tsx server/scripts/seed.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.4.0",
+    "@react-three/rapier": "^2.2.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.6",
     "express": "^5.2.1",
@@ -33,7 +39,9 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -42,6 +50,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "esbuild": "^0.28.1",
     "eslint": "^10.6.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",

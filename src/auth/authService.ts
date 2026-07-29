@@ -1,4 +1,5 @@
 import { APP_CONFIG } from '../config/appConfig';
+import { setOfflineSyncParticipant } from '../utils/offlineSync';
 
 export type AvatarId = 'avatar_01' | 'avatar_02' | 'avatar_03';
 
@@ -63,10 +64,12 @@ export const authService = {
         sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
         localStorage.removeItem('token');
         localStorage.removeItem('participant');
+        setOfflineSyncParticipant(session.participant.id);
         return session;
     },
 
     logout(): void {
+        setOfflineSyncParticipant(null);
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         localStorage.removeItem('token');
         localStorage.removeItem('participant');
@@ -74,7 +77,10 @@ export const authService = {
 
     getCurrentSession(): AuthSession | null {
         const rawSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (!rawSession) return null;
+        if (!rawSession) {
+            setOfflineSyncParticipant(null);
+            return null;
+        }
 
         try {
             const session: unknown = JSON.parse(rawSession);
@@ -82,6 +88,7 @@ export const authService = {
                 this.logout();
                 return null;
             }
+            setOfflineSyncParticipant(session.participant.id);
             return session;
         } catch {
             this.logout();

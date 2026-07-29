@@ -1,10 +1,18 @@
 import { apiFetch, ApiError } from '../api/apiClient';
+import type { CampusZoneId, PlayerLocation } from '../../shared/campus';
+import { APP_CONFIG } from '../config/appConfig';
+import { sendWithOfflineFallback } from '../utils/offlineSync';
 
 export type TrainingProgress = {
     participantId: string;
     moduleId: string;
-    visitedCheckpoints: string[];
+    moduleVersion: number;
+    worldVersion: number;
+    lastLocation: PlayerLocation;
     completedContents: string[];
+    simulationDecisionCount: number;
+    completedSimulationDecisionIds: string[];
+    simulationCompleted: boolean;
     score: number | null;
     status: 'not_started' | 'in_progress' | 'approved' | 'failed';
     durationSeconds: number;
@@ -19,7 +27,7 @@ export const progressService = {
     ): Promise<TrainingProgress | null> {
         try {
             const response = await apiFetch(
-                `/progress/${encodeURIComponent(participantId)}?moduleId=${encodeURIComponent(moduleId)}`,
+                `/progress/${encodeURIComponent(participantId)}?moduleId=${encodeURIComponent(moduleId)}&moduleVersion=${APP_CONFIG.TRAINING_MODULE_VERSION}`,
                 { signal },
             );
             return await response.json() as TrainingProgress;
@@ -29,16 +37,18 @@ export const progressService = {
         }
     },
 
-    async markCheckpointVisited(moduleId: string, checkpointId: string): Promise<TrainingProgress> {
-        const response = await apiFetch('/progress/checkpoint', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ moduleId, checkpointId }),
-        });
-        const payload = await response.json() as { progress?: TrainingProgress };
-        if (!payload.progress || !Array.isArray(payload.progress.visitedCheckpoints)) {
-            throw new Error('El servidor devolvió un progreso de checkpoints inválido.');
-        }
-        return payload.progress;
+    async saveLocation(
+        zoneId: CampusZoneId,
+        spawnId: string,
+        durationSeconds: number,
+    ): Promise<'sent' | 'queued'> {
+        return sendWithOfflineFallback('/progress/location', {
+            moduleId: APP_CONFIG.TRAINING_MODULE_ID,
+            moduleVersion: APP_CONFIG.TRAINING_MODULE_VERSION,
+            worldVersion: APP_CONFIG.CAMPUS_WORLD_VERSION,
+            zoneId,
+            spawnId,
+            durationSeconds: Math.max(0, Math.floor(durationSeconds)),
+        }, 'PUT');
     },
 };

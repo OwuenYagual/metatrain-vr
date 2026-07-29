@@ -1,13 +1,20 @@
 import {
     MIN_PASSING_SCORE,
-    TRAINING_CHECKPOINTS,
     TRAINING_MODULE_ID,
     TRAINING_STATIONS,
 } from '../../shared/trainingModule';
+import {
+    CAMPUS_WORLD_ID,
+    CAMPUS_WORLD_VERSION,
+    TRAINING_MODULE_VERSION,
+} from '../../shared/campus';
 
 export const APP_CONFIG = {
-    API_URL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+    API_URL: import.meta.env?.VITE_API_URL || 'http://localhost:3000/api',
     TRAINING_MODULE_ID,
+    TRAINING_MODULE_VERSION,
+    CAMPUS_WORLD_ID,
+    CAMPUS_WORLD_VERSION,
     MIN_PASSING_SCORE,
     AUTOSAVE_INTERVAL_MS: 15_000,
     TARGET_FPS: 60,
@@ -17,9 +24,8 @@ export const APP_CONFIG = {
     MAX_SCENE_SIZE_MB: 25,
     MAX_TEXTURE_SIZE_PX: 2048,
     MIN_REQUIRED_INTERACTIONS: 3,
-    MIN_REQUIRED_CHECKPOINTS: TRAINING_CHECKPOINTS.length,
     MIN_REQUIRED_CONTENTS: TRAINING_STATIONS.length,
-    CERTIFICATE_ENABLED: false,
+    CERTIFICATE_ENABLED: true,
     // El MVP usa puntero/raycast. Una futura entrada WebXR deberá consumir los mismos servicios de interacción.
     IMMERSIVE_INPUT_MODE: 'pointer',
 } as const;

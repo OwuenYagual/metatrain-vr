@@ -1,4 +1,5 @@
 import { apiFetch, ApiError } from '../api/apiClient';
+import { APP_CONFIG } from '../config/appConfig';
 
 export type EvaluationOption = {
     id: string;
@@ -95,7 +96,13 @@ export const evaluationService = {
         const response = await apiFetch(`/evaluation/${encodeURIComponent(moduleId)}/submit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ answers }),
+            body: JSON.stringify({
+                moduleVersion: APP_CONFIG.TRAINING_MODULE_VERSION,
+                worldVersion: APP_CONFIG.CAMPUS_WORLD_VERSION,
+                zoneId: 'assessment-room',
+                durationSeconds: 0,
+                answers,
+            }),
         });
         const payload = await response.json() as { result?: unknown };
         if (!isEvaluationResult(payload.result)) {

@@ -1,5 +1,6 @@
 import { apiFetch } from '../api/apiClient';
 import type { TrainingProgress } from '../progress/progressService';
+import { APP_CONFIG } from '../config/appConfig';
 
 export type Content = {
     _id: string;
@@ -19,11 +20,23 @@ export const contentService = {
         return data as Content[];
     },
 
-    async markContentCompleted(moduleId: string, contentId: string): Promise<TrainingProgress> {
+    async markContentCompleted(
+        moduleId: string,
+        contentId: string,
+        durationSeconds = 0,
+    ): Promise<TrainingProgress> {
         const response = await apiFetch('/progress/content', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ moduleId, contentId }),
+            body: JSON.stringify({
+                clientEventId: crypto.randomUUID(),
+                moduleId,
+                moduleVersion: APP_CONFIG.TRAINING_MODULE_VERSION,
+                worldVersion: APP_CONFIG.CAMPUS_WORLD_VERSION,
+                zoneId: 'induction-office',
+                contentId,
+                durationSeconds: Math.max(0, Math.floor(durationSeconds)),
+            }),
         });
         const payload = await response.json() as { progress?: TrainingProgress };
         if (!payload.progress || !Array.isArray(payload.progress.completedContents)) {
