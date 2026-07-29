@@ -1,4 +1,5 @@
 import { apiFetch } from '../api/apiClient';
+import { APP_CONFIG } from '../config/appConfig';
 
 export type SimulationOption = {
     id: string;
@@ -108,7 +109,16 @@ export const simulationService = {
         const response = await apiFetch(`/simulation/${encodeURIComponent(moduleId)}/decisions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ scenarioId, decisionId, selectedOptionId }),
+            body: JSON.stringify({
+                clientEventId: crypto.randomUUID(),
+                moduleVersion: APP_CONFIG.TRAINING_MODULE_VERSION,
+                worldVersion: APP_CONFIG.CAMPUS_WORLD_VERSION,
+                zoneId: 'simulation-lab',
+                durationSeconds: 0,
+                scenarioId,
+                decisionId,
+                selectedOptionId,
+            }),
         });
         const payload = await response.json() as { selection?: unknown; simulation?: unknown };
         if (!isSelection(payload.selection) || !isProgress(payload.simulation)) {

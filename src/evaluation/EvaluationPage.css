@@ -1,0 +1,72 @@
+.voice-answer-unavailable {
+    border-radius: 8px;
+    background: #fff7ed;
+    padding: 0.75rem;
+    color: #9a3412;
+}
+
+.voice-answer-controls {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 0.85rem;
+}
+
+.voice-answer-controls > button {
+    justify-self: start;
+    border: 1px solid #93c5fd;
+    border-radius: 9px;
+    background: #eff6ff;
+    padding: 0.65rem 0.8rem;
+    color: #1d4ed8;
+    font: inherit;
+    font-weight: 750;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+}
+
+.voice-answer-controls > button.is-listening {
+    border-color: #ef4444;
+    background: #fef2f2;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+    color: #b91c1c;
+}
+
+.voice-answer-controls > button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.voice-answer-feedback {
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 0.8rem;
+}
+
+.voice-answer-feedback.is-error {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.voice-answer-feedback p {
+    margin: 0 0 0.55rem;
+}
+
+.voice-answer-feedback > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.voice-answer-feedback button {
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0.5rem 0.65rem;
+    color: #1e40af;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}

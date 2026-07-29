@@ -13,8 +13,16 @@ import {
     certificateService,
     type CertificateSummary,
 } from '../certificate/certificateService';
+import { useVoiceAnswer } from '../speech/useVoiceAnswer';
+import './EvaluationPage.css';
 
-export default function EvaluationPage() {
+const ignoreMicrophoneState = () => undefined;
+
+export default function EvaluationPage({
+    onMicrophoneActiveChange = ignoreMicrophoneState,
+}: {
+    onMicrophoneActiveChange?: (active: boolean) => void;
+}) {
     const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [result, setResult] = useState<EvaluationResult | null>(null);
@@ -26,6 +34,7 @@ export default function EvaluationPage() {
     const [error, setError] = useState('');
     const navigate = useNavigate();
     const session = authService.getCurrentSession();
+    const voice = useVoiceAnswer(onMicrophoneActiveChange);
     const answeredCount = useMemo(
         () => questions.filter((question) => Boolean(answers[question.id])).length,
         [answers, questions],
@@ -78,6 +87,7 @@ export default function EvaluationPage() {
     };
 
     const retryEvaluation = () => {
+        voice.cancel();
         setAnswers({});
         setResult(null);
         setError('');
@@ -190,8 +200,14 @@ export default function EvaluationPage() {
                 {!loading && !result && questions.length > 0 && (
                     <form onSubmit={submitEvaluation}>
                         <p id="evaluation-instructions" style={{ padding: '0.85rem', background: '#eff6ff', color: '#1e40af', borderRadius: 8 }}>
-                            Selecciona una respuesta por pregunta. Necesitas {passingScore}% para aprobar.
+                            Selecciona una respuesta por pregunta. También puedes mantener pulsado el micrófono,
+                            decir el número o el texto de una opción y confirmarla. Necesitas {passingScore}% para aprobar.
                         </p>
+                        {voice.capabilities && !voice.capabilities.transcriptionAvailable && (
+                            <p role="status" className="voice-answer-unavailable">
+                                Las respuestas por voz no están configuradas. Los controles manuales siguen disponibles.
+                            </p>
+                        )}
                         <p aria-live="polite" style={{ margin: '1rem 0', fontWeight: 700 }}>
                             {answeredCount} de {questions.length} respondidas
                         </p>
@@ -209,11 +225,90 @@ export default function EvaluationPage() {
                                                     name={`question-${question.id}`}
                                                     value={option.id}
                                                     checked={answers[question.id] === option.id}
-                                                    onChange={() => setAnswers((current) => ({ ...current, [question.id]: option.id }))}
+                                                    onChange={() => {
+                                                        if (voice.activeQuestionId === question.id) voice.cancel();
+                                                        setAnswers((current) => ({ ...current, [question.id]: option.id }));
+                                                    }}
                                                 />
                                                 <span>{option.text}</span>
                                             </label>
                                         ))}
+                                    </div>
+                                    <div className="voice-answer-controls">
+                                        <button
+                                            type="button"
+                                            className={voice.activeQuestionId === question.id && voice.status === 'listening' ? 'is-listening' : ''}
+                                            disabled={submitting
+                                                || voice.capabilities?.transcriptionAvailable === false
+                                                || (voice.activeQuestionId !== null
+                                                    && voice.activeQuestionId !== question.id
+                                                    && ['requesting', 'listening', 'processing'].includes(voice.status))}
+                                            aria-label={`Mantener para responder por voz la pregunta ${questionIndex + 1}`}
+                                            onPointerDown={(event) => {
+                                                event.preventDefault();
+                                                event.currentTarget.setPointerCapture(event.pointerId);
+                                                void voice.begin(question);
+                                            }}
+                                            onPointerUp={(event) => {
+                                                event.preventDefault();
+                                                voice.end();
+                                            }}
+                                            onPointerCancel={voice.end}
+                                            onKeyDown={(event) => {
+                                                if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+                                                    event.preventDefault();
+                                                    void voice.begin(question);
+                                                }
+                                            }}
+                                            onKeyUp={(event) => {
+                                                if (event.key === ' ' || event.key === 'Enter') {
+                                                    event.preventDefault();
+                                                    voice.end();
+                                                }
+                                            }}
+                                        >
+                                            {voice.activeQuestionId === question.id && voice.status === 'requesting'
+                                                ? 'Permitiendo micrófono…'
+                                                : voice.activeQuestionId === question.id && voice.status === 'listening'
+                                                    ? 'Escuchando… suelta para enviar'
+                                                    : voice.activeQuestionId === question.id && voice.status === 'processing'
+                                                        ? 'Reconociendo respuesta…'
+                                                        : 'Mantener para responder'}
+                                        </button>
+
+                                        {voice.activeQuestionId === question.id && voice.status === 'error' && (
+                                            <div role="alert" className="voice-answer-feedback is-error">
+                                                <p>{voice.error}</p>
+                                                <button type="button" onClick={voice.cancel}>Cerrar</button>
+                                            </div>
+                                        )}
+
+                                        {voice.activeQuestionId === question.id && voice.proposal && (
+                                            <div role="status" aria-live="polite" className="voice-answer-feedback">
+                                                <p><strong>Se entendió:</strong> “{voice.proposal.transcript}”</p>
+                                                {voice.proposal.status === 'matched' && voice.proposal.optionId ? (
+                                                    <p>
+                                                        <strong>Opción propuesta:</strong>{' '}
+                                                        {question.options.find(({ id }) => id === voice.proposal?.optionId)?.text}
+                                                    </p>
+                                                ) : (
+                                                    <p>No hay una coincidencia clara. Di “opción uno”, “opción dos” o lee una respuesta.</p>
+                                                )}
+                                                <div>
+                                                    {voice.proposal.status === 'matched' && voice.proposal.optionId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => voice.confirm((questionId, optionId) => {
+                                                                setAnswers((current) => ({ ...current, [questionId]: optionId }));
+                                                            })}
+                                                        >
+                                                            Confirmar opción
+                                                        </button>
+                                                    )}
+                                                    <button type="button" onClick={voice.cancel}>Cancelar o reintentar</button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </fieldset>
                             ))}
