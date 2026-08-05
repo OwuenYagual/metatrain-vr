@@ -39,6 +39,7 @@ export type DirectoryActivity = BaseActivity & {
         person: string;
         role: string;
         channel: string;
+        imageUrl: string;
     }>;
 };
 
@@ -48,13 +49,7 @@ export type SequenceActivity = BaseActivity & {
     correctOrder: string[];
 };
 
-export type ChecklistActivity = BaseActivity & {
-    kind: 'checklist';
-    options: ActivityOption[];
-    correctOptionIds: string[];
-};
-
-export type InductionActivity = ScenarioActivity | DirectoryActivity | SequenceActivity | ChecklistActivity;
+export type InductionActivity = ScenarioActivity | DirectoryActivity | SequenceActivity;
 
 export const INDUCTION_ACTIVITIES: Record<string, InductionActivity> = {
     obj_manual: {
@@ -145,11 +140,11 @@ export const INDUCTION_ACTIVITIES: Record<string, InductionActivity> = {
             ],
         },
         departments: [
-            { id: 'management', name: 'Dirección General', purpose: 'Define la estrategia y las prioridades de la empresa.', person: 'Elena Torres', role: 'Directora General', channel: 'Reunión mensual y comunicados corporativos' },
-            { id: 'people', name: 'Talento Humano', purpose: 'Acompaña contratación, beneficios, desarrollo y convivencia.', person: 'Sofía Andrade', role: 'Coordinadora de Talento Humano', channel: 'Portal interno o talento@empresa.local' },
-            { id: 'operations', name: 'Operaciones', purpose: 'Coordina la ejecución diaria y el cumplimiento de los servicios.', person: 'Carlos Méndez', role: 'Supervisor de Operaciones', channel: 'Reunión diaria y tablero de tareas' },
-            { id: 'technology', name: 'Tecnología', purpose: 'Gestiona accesos, equipos, aplicaciones y soporte técnico.', person: 'Diego Ruiz', role: 'Líder de Tecnología', channel: 'Mesa de ayuda interna' },
-            { id: 'safety', name: 'Seguridad y Salud', purpose: 'Previene riesgos y coordina la respuesta ante incidentes.', person: 'Valeria León', role: 'Responsable de SST', channel: 'Canal de incidentes y extensión 101' },
+            { id: 'management', name: 'Dirección General', purpose: 'Define la estrategia y las prioridades de la empresa.', person: 'Elena Torres', role: 'Directora General', channel: 'Reunión mensual y comunicados corporativos', imageUrl: '/images/people/elena-torres.webp' },
+            { id: 'people', name: 'Talento Humano', purpose: 'Acompaña contratación, beneficios, desarrollo y convivencia.', person: 'Sofía Andrade', role: 'Coordinadora de Talento Humano', channel: 'Portal interno o talento@empresa.local', imageUrl: '/images/people/sofia-andrade.webp' },
+            { id: 'operations', name: 'Operaciones', purpose: 'Coordina la ejecución diaria y el cumplimiento de los servicios.', person: 'Carlos Méndez', role: 'Supervisor de Operaciones', channel: 'Reunión diaria y tablero de tareas', imageUrl: '/images/people/carlos-mendez.webp' },
+            { id: 'technology', name: 'Tecnología', purpose: 'Gestiona accesos, equipos, aplicaciones y soporte técnico.', person: 'Diego Ruiz', role: 'Líder de Tecnología', channel: 'Mesa de ayuda interna', imageUrl: '/images/people/diego-ruiz.webp' },
+            { id: 'safety', name: 'Seguridad y Salud', purpose: 'Previene riesgos y coordina la respuesta ante incidentes.', person: 'Valeria León', role: 'Responsable de SST', channel: 'Canal de incidentes y extensión 101', imageUrl: '/images/people/valeria-leon.webp' },
         ],
     },
     obj_funciones: {
@@ -247,46 +242,4 @@ export const INDUCTION_ACTIVITIES: Record<string, InductionActivity> = {
             },
         ],
     },
-    obj_examen: {
-        kind: 'checklist',
-        title: 'Reto del primer día',
-        introduction: 'Selecciona únicamente las acciones que forman parte de tus responsabilidades como Analista de Operaciones.',
-        training: {
-            greeting: 'Hagamos un repaso final. Tu primer día será exitoso si trabajas con orden, trazabilidad y comunicación oportuna.',
-            lessons: [
-                {
-                    id: 'prepare',
-                    title: 'Prepárate antes de ejecutar',
-                    explanation: 'Confirma las prioridades y plazos con tu supervisor y verifica que cuentas con los accesos, el procedimiento y la información necesarios.',
-                    keyPoint: 'No comiences una tarea sin conocer el resultado esperado.',
-                },
-                {
-                    id: 'evidence',
-                    title: 'Deja evidencia del trabajo',
-                    explanation: 'Registra avances, resultados y documentos en el tablero o repositorio corporativo indicado para que el equipo pueda dar seguimiento.',
-                    keyPoint: 'Lo realizado debe quedar visible y trazable.',
-                },
-                {
-                    id: 'boundaries',
-                    title: 'Reconoce los límites de tu función',
-                    explanation: 'Puedes proponer mejoras, pero no cambiar procesos sin autorización ni compartir credenciales. Los bloqueos se comunican, no se ocultan.',
-                    keyPoint: 'Propón y escala; no cambies ni compartas accesos por tu cuenta.',
-                },
-            ],
-        },
-        correctOptionIds: ['priorities', 'procedure', 'evidence', 'blockers'],
-        options: [
-            { id: 'priorities', label: 'Confirmar prioridades y plazos con el supervisor.' },
-            { id: 'procedure', label: 'Seguir el procedimiento vigente al ejecutar cada tarea.' },
-            { id: 'evidence', label: 'Registrar avances y evidencias en el tablero.' },
-            { id: 'blockers', label: 'Comunicar bloqueos antes de que afecten el resultado.' },
-            { id: 'passwords', label: 'Compartir credenciales para que el equipo avance más rápido.' },
-            { id: 'changes', label: 'Cambiar un proceso sin aprobación ni registro.' },
-        ],
-    },
 };
-
-export function isChecklistSelectionCorrect(selectedIds: readonly string[], correctIds: readonly string[]): boolean {
-    const selected = new Set(selectedIds);
-    return selected.size === correctIds.length && correctIds.every((id) => selected.has(id));
-}

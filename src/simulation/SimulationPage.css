@@ -97,7 +97,7 @@
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 1fr auto;
     gap: 0.7rem;
     align-items: center;
     border: 1px solid #e2e8f0;
@@ -118,15 +118,6 @@
     border-color: #86efac;
     background: #f0fdf4;
     color: #166534;
-}
-
-.office-zone-icon {
-    display: grid;
-    place-items: center;
-    width: 2.2rem;
-    height: 2.2rem;
-    border-radius: 50%;
-    background: #fff;
 }
 
 .office-zone div {

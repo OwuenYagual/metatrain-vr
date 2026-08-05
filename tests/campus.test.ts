@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+    CAMPUS_GUIDE_OBJECT_ID,
     CAMPUS_INTERACTION_DISTANCE,
     CAMPUS_MANIFEST,
     createDefaultPlayerLocation,
@@ -19,6 +20,7 @@ test('el manifiesto del campus tiene zonas, portales y estaciones coherentes', (
     assert.equal(CAMPUS_MANIFEST.zones.length, 4);
     assert.equal(isCampusInteraction('induction-office', 'obj_manual'), true);
     assert.equal(isCampusInteraction('lobby', 'obj_manual'), false);
+    assert.equal(isCampusInteraction('lobby', CAMPUS_GUIDE_OBJECT_ID), true);
 });
 
 test('los puntos de aparición quedan fuera del alcance de los portales de su zona', () => {

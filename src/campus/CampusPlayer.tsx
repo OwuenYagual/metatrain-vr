@@ -10,12 +10,14 @@ import {
     Euler,
     MathUtils,
     Object3D,
+    PerspectiveCamera,
     Vector3,
 } from 'three';
 import type { AvatarId } from '../auth/authService';
 import {
     CAMPUS_INTERACTION_DISTANCE,
     type SpawnManifest,
+    type Vector3Tuple,
 } from '../../shared/campus';
 import { getCampusMovementVector, type CampusMovementState } from './campusControls';
 import {
@@ -64,6 +66,7 @@ export function CampusPlayer({
     movementRef,
     cameraMode,
     paused,
+    conversationFocusTarget,
     targets,
     onNearbyTargetChange,
     onStep,
@@ -73,6 +76,7 @@ export function CampusPlayer({
     movementRef: RefObject<CampusMovementState>;
     cameraMode: CampusCameraMode;
     paused: boolean;
+    conversationFocusTarget: Vector3Tuple | null;
     targets: readonly CampusInteractionTarget[];
     onNearbyTargetChange: (target: CampusInteractionTarget | null) => void;
     onStep: () => void;
@@ -88,6 +92,9 @@ export function CampusPlayer({
     const lastManualCameraMoveAtRef = useRef(Number.NEGATIVE_INFINITY);
     const cameraYawRef = useRef(spawn.rotationY + Math.PI);
     const cameraPitchRef = useRef(-0.04);
+    const cameraFocusObjectRef = useRef(new PerspectiveCamera());
+    const conversationFocusKeyRef = useRef<string | null>(null);
+    const cameraBeforeConversationRef = useRef<{ yaw: number; pitch: number } | null>(null);
     const cameraInitializedRef = useRef(false);
     const stepDistanceRef = useRef(0);
     const { camera, gl } = useThree();
@@ -266,8 +273,52 @@ export function CampusPlayer({
 
         const updatedTranslation = body.translation();
         const updatedPosition = new Vector3(updatedTranslation.x, updatedTranslation.y, updatedTranslation.z);
+        if (!conversationFocusTarget && conversationFocusKeyRef.current) {
+            const previousCamera = cameraBeforeConversationRef.current;
+            if (previousCamera) {
+                cameraYawRef.current = previousCamera.yaw;
+                cameraPitchRef.current = previousCamera.pitch;
+            }
+            cameraBeforeConversationRef.current = null;
+            conversationFocusKeyRef.current = null;
+        }
         if (cameraMode === 'first-person') {
             const headPosition = updatedPosition.clone().add(new Vector3(0, 0.62, 0));
+            if (conversationFocusTarget) {
+                const focusTarget = new Vector3(...conversationFocusTarget);
+                const focusKey = conversationFocusTarget.join(':');
+                if (conversationFocusKeyRef.current !== focusKey) {
+                    const previousCamera = {
+                        yaw: cameraYawRef.current,
+                        pitch: cameraPitchRef.current,
+                    };
+                    cameraBeforeConversationRef.current ??= previousCamera;
+                    camera.position.copy(headPosition);
+                    camera.rotation.copy(new Euler(
+                        previousCamera.pitch,
+                        previousCamera.yaw,
+                        0,
+                        'YXZ',
+                    ));
+                    conversationFocusKeyRef.current = focusKey;
+                }
+
+                const focusDirection = focusTarget.clone().sub(headPosition);
+                cameraYawRef.current = Math.atan2(-focusDirection.x, -focusDirection.z);
+                cameraPitchRef.current = Math.atan2(
+                    focusDirection.y,
+                    Math.hypot(focusDirection.x, focusDirection.z),
+                );
+
+                camera.position.copy(headPosition);
+                const interpolation = 1 - Math.exp(-delta * 5.5);
+                const focusObject = cameraFocusObjectRef.current;
+                focusObject.position.copy(headPosition);
+                focusObject.lookAt(focusTarget);
+                camera.quaternion.slerp(focusObject.quaternion, interpolation);
+                cameraInitializedRef.current = true;
+                return;
+            }
             camera.position.copy(headPosition);
             camera.rotation.copy(new Euler(
                 cameraPitchRef.current,

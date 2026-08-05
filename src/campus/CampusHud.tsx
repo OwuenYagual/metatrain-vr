@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import type { CampusZoneId } from '../../shared/campus';
+import {
+    isNpcSpeechSpeed,
+    NPC_SPEECH_SPEED_OPTIONS,
+    type NpcSpeechSpeed,
+} from '../induction/npcSpeech';
 import type { CampusCameraMode } from './CampusPlayer';
 import type { CampusInteractionTarget } from './campusTargets';
+import { StatusIcon } from '../components/StatusIcon';
 
 type HudZone = {
     id: CampusZoneId;
@@ -60,6 +66,8 @@ export function CampusHud({
     onMutedChange,
     onAmbientVolumeChange,
     onVoiceVolumeChange,
+    speechSpeed,
+    onSpeechSpeedChange,
 }: {
     zoneTitle: string;
     objective: string;
@@ -83,6 +91,8 @@ export function CampusHud({
     onMutedChange: (muted: boolean) => void;
     onAmbientVolumeChange: (volume: number) => void;
     onVoiceVolumeChange: (volume: number) => void;
+    speechSpeed: NpcSpeechSpeed;
+    onSpeechSpeedChange: (speed: NpcSpeechSpeed) => void;
 }) {
     const percentage = totalCount > 0 ? Math.round(completedCount / totalCount * 100) : 0;
     const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
@@ -122,7 +132,11 @@ export function CampusHud({
                             className={`${zone.current ? 'is-current' : ''} ${zone.completed ? 'is-completed' : ''} ${zone.unlocked ? '' : 'is-locked'}`}
                             aria-current={zone.current ? 'step' : undefined}
                         >
-                            <span aria-hidden="true">{zone.completed ? '✓' : zone.unlocked ? index + 1 : '•'}</span>
+                            <span aria-hidden="true">
+                                {zone.completed
+                                    ? <StatusIcon name="check" />
+                                    : zone.unlocked ? index + 1 : <StatusIcon name="lock" />}
+                            </span>
                             <span className="campus-zone-route-label">{zone.title}</span>
                         </li>
                     ))}
@@ -154,22 +168,20 @@ export function CampusHud({
                 >
                     <SpeakerIcon muted={audio.muted} />
                 </button>
-                {audio.started && (
-                    <button
-                        type="button"
-                        className={audioSettingsOpen ? 'is-active' : ''}
-                        aria-label={audioSettingsOpen ? 'Ocultar volúmenes' : 'Ajustar volúmenes'}
-                        aria-expanded={audioSettingsOpen}
-                        title="Ajustar volúmenes"
-                        onClick={() => setAudioSettingsOpen((current) => !current)}
-                    >
-                        <span aria-hidden="true">≡</span>
-                    </button>
-                )}
+                <button
+                    type="button"
+                    className={audioSettingsOpen ? 'is-active' : ''}
+                    aria-label={audioSettingsOpen ? 'Ocultar ajustes' : 'Mostrar ajustes'}
+                    aria-expanded={audioSettingsOpen}
+                    title="Ajustes"
+                    onClick={() => setAudioSettingsOpen((current) => !current)}
+                >
+                    <span aria-hidden="true">≡</span>
+                </button>
             </nav>
 
-            {audio.started && audioSettingsOpen && (
-                <section className="campus-audio-popover" aria-label="Volúmenes del campus">
+            {audioSettingsOpen && (
+                <section className="campus-audio-popover" aria-label="Ajustes del campus">
                     <label>
                         <span>Ambiente</span>
                         <input
@@ -193,6 +205,22 @@ export function CampusHud({
                             onChange={(event) => onVoiceVolumeChange(Number(event.target.value))}
                             aria-label="Volumen de voces"
                         />
+                    </label>
+                    <label>
+                        <span>Texto</span>
+                        <select
+                            value={speechSpeed}
+                            aria-label="Velocidad de aparición del texto"
+                            onChange={(event) => {
+                                if (isNpcSpeechSpeed(event.target.value)) {
+                                    onSpeechSpeedChange(event.target.value);
+                                }
+                            }}
+                        >
+                            {NPC_SPEECH_SPEED_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
                     </label>
                 </section>
             )}

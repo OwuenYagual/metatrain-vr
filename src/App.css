@@ -182,3 +182,90 @@
     border-right-color: var(--border);
   }
 }
+
+.global-user-menu {
+  position: fixed;
+  z-index: 100;
+  right: 1rem;
+  bottom: 1rem;
+}
+
+.global-user-menu > button {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.66);
+  border-radius: 50%;
+  background: rgba(248, 250, 252, 0.96);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.3);
+  color: #334155;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.global-user-menu > button:hover,
+.global-user-menu > button.is-active {
+  border-color: #38bdf8;
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.global-user-menu svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.global-user-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.5rem);
+  width: max-content;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.24);
+  padding: 0.35rem;
+}
+
+.global-user-popover button {
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 0.55rem 0.75rem;
+  color: #b91c1c;
+  font: 700 0.82rem/1.2 ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.global-user-popover button:hover,
+.global-user-popover button:focus-visible {
+  background: #fef2f2;
+}
+
+.global-user-menu button:focus-visible {
+  outline: 3px solid #38bdf8;
+  outline-offset: 3px;
+}
+
+body:has(.induction-panel) .global-user-menu {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .global-user-menu {
+    right: 0.55rem;
+    bottom: 0.55rem;
+  }
+
+  .global-user-menu > button {
+    width: 1.85rem;
+    height: 1.85rem;
+  }
+
+}

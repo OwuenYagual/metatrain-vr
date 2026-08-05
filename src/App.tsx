@@ -3,12 +3,14 @@ import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-d
 import AuthPage from './auth/AuthPage';
 import RegisterPage from './auth/RegisterPage';
 import { authService } from './auth/authService';
+import { UserMenu } from './auth/UserMenu';
+import './App.css';
 
 const AvatarSelector = lazy(() => import('./avatar/AvatarSelector'));
 const CampusPage = lazy(() => import('./campus/CampusPage'));
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-    return authService.getCurrentSession() ? children : <Navigate to="/login" replace />;
+    return authService.getCurrentSession() ? <>{children}<UserMenu /></> : <Navigate to="/login" replace />;
 }
 
 export default function App() {

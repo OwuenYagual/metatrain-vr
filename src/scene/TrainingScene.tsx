@@ -220,10 +220,9 @@ function NpcDialogueBubble({ stationId, guide }: { stationId: string; guide: Int
                 className={`station-dialogue-bubble is-${speech.kind}`}
                 key={speech.bubbleId}
                 role="status"
-                aria-label={`${guide.name}. ${speech.label}: ${speech.fullText}`}
+                aria-label={`${guide.name}. ${speech.fullText}`}
             >
                 <span className="station-dialogue-speaker">{guide.name}</span>
-                <strong>{speech.label}</strong>
                 <p aria-hidden="true">
                     {speech.visibleText}
                     {speech.typing && <span className="station-dialogue-cursor">▌</span>}
@@ -290,7 +289,7 @@ function StationTrigger({ position, id, title, variant, guide, onOpen }: Interac
             <NpcGuideModel color={guide.color} unlocked={unlocked} />
             {completed && <CompletedMarker />}
             {active && <NpcDialogueBubble stationId={id} guide={guide} />}
-            {unlocked && !completed && !active && (
+            {unlocked && !completed && !activeContent && (
                 <Html position={[GUIDE_POSITION[0], 2.15, GUIDE_POSITION[2]]} center distanceFactor={7} style={{ pointerEvents: 'auto' }}>
                     <button
                         type="button"

@@ -21,10 +21,6 @@
     touch-action: none;
 }
 
-.campus-world-shell.is-paused canvas {
-    filter: saturate(0.78) brightness(0.72);
-}
-
 .campus-loading,
 .campus-webgl-error {
     display: grid;
@@ -242,7 +238,7 @@
 .campus-quick-controls {
     position: absolute;
     z-index: 16;
-    bottom: 1rem;
+    bottom: 3.75rem;
     right: 1rem;
     display: flex;
     flex-direction: column;
@@ -314,8 +310,19 @@
     font-weight: 800;
 }
 
-.campus-audio-popover input {
+.campus-audio-popover input,
+.campus-audio-popover select {
     width: 100%;
+}
+
+.campus-audio-popover select {
+    box-sizing: border-box;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #fff;
+    padding: 0.35rem 0.45rem;
+    color: #334155;
+    font: inherit;
 }
 
 .campus-controls-help {
@@ -424,6 +431,24 @@
     color: #fef3c7;
 }
 
+.campus-world-label.is-station-title {
+    position: relative;
+    padding: 0.42rem 0.68rem;
+    font-size: 0.72rem;
+}
+
+.campus-world-label.is-station-title::after {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border: 6px solid transparent;
+    border-top-color: rgba(8, 20, 38, 0.9);
+    content: '';
+    transform: translateX(-50%);
+}
+
 .campus-npc-label {
     border-color: rgba(148, 163, 184, 0.48);
     background: rgba(255, 255, 255, 0.92);
@@ -477,15 +502,6 @@
 
 .campus-npc-dialogue-bubble.is-key-point::after {
     border-color: #22c55e;
-}
-
-.campus-npc-dialogue-bubble > strong {
-    display: block;
-}
-
-.campus-npc-dialogue-bubble > strong {
-    margin-bottom: 0.34rem;
-    font-size: 0.84rem;
 }
 
 .campus-npc-dialogue-bubble p {
@@ -647,7 +663,7 @@
     }
 
     .campus-quick-controls {
-        bottom: 0.55rem;
+        bottom: 3.35rem;
         right: 0.55rem;
     }
 

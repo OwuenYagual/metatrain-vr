@@ -59,7 +59,7 @@ async function getGuidedRouteProgress(participantId: string, moduleId: string, r
     const contentsCompleted = requiredContentIds.filter((contentId) => completedContents.has(contentId)).length;
     if (!progress || contentsCompleted !== requiredContentIds.length) {
         res.status(409).json({
-            error: 'Completa las cinco actividades antes de iniciar la simulación.',
+            error: 'Completa las cuatro actividades antes de iniciar la simulación.',
             requirements: {
                 contents: { completed: contentsCompleted, required: requiredContentIds.length },
             },

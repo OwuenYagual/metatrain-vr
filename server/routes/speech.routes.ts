@@ -61,8 +61,7 @@ router.get(
                 res.status(503).json({ error: 'La narración por voz no está configurada.' });
                 return;
             }
-            if (req.params.moduleId !== CAMPUS_MANIFEST.moduleId
-                || !hasActiveCampusContext(req, 'induction-office')) {
+            if (req.params.moduleId !== CAMPUS_MANIFEST.moduleId) {
                 res.status(409).json({ error: 'La narración no pertenece al mundo, módulo o zona activos.' });
                 return;
             }
@@ -71,6 +70,10 @@ router.get(
             const descriptor = resolveNarration(stationId, bubbleId);
             if (!descriptor) {
                 res.status(404).json({ error: 'La narración solicitada no existe.' });
+                return;
+            }
+            if (!hasActiveCampusContext(req, descriptor.zoneId)) {
+                res.status(409).json({ error: 'La narración no pertenece al mundo, módulo o zona activos.' });
                 return;
             }
             const cacheKey = [

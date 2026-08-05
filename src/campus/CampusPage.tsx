@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+    CAMPUS_GUIDE_OBJECT_ID,
     CAMPUS_MANIFEST,
     getCampusSpawn,
     getCampusZone,
@@ -19,11 +20,23 @@ import {
     type CampusZoneId,
     type PlayerLocation,
 } from '../../shared/campus';
-import { TRAINING_STATIONS } from '../../shared/trainingModule';
+import {
+    TRAINING_INTERACTION_OBJECT_IDS,
+    TRAINING_STATIONS,
+} from '../../shared/trainingModule';
 import { authService } from '../auth/authService';
 import { getErrorMessage } from '../api/apiClient';
 import { contentService } from '../content/contentService';
 import InductionActivityPanel from '../induction/InductionActivityPanel';
+import {
+    getSavedNpcSpeechSpeed,
+    saveNpcSpeechSpeed,
+    type NpcSpeechSpeed,
+} from '../induction/npcSpeech';
+import {
+    CAMPUS_GUIDE_BUBBLE_ID,
+    CAMPUS_GUIDE_DIALOGUE,
+} from '../../shared/speech';
 import { getCompletedStationIds } from '../progress/contentProgress';
 import { progressService, type TrainingProgress } from '../progress/progressService';
 import { SceneErrorBoundary } from '../scene/SceneErrorBoundary';
@@ -35,6 +48,7 @@ import { CampusOverlay } from './CampusOverlay';
 import type { CampusCameraMode } from './CampusPlayer';
 import {
     buildCampusInteractionTargets,
+    getTrainingGuideFocusPosition,
     type CampusInteractionTarget,
 } from './campusTargets';
 import { CampusWorld } from './CampusWorld';
@@ -68,7 +82,7 @@ function getObjective(
     completedStationIds: readonly string[],
 ): string {
     if (zoneId === 'lobby') {
-        if (!progress.trainingCompleted) return 'Entra al Centro de inducción y completa sus cinco estaciones.';
+        if (!progress.trainingCompleted) return 'Entra al Centro de inducción y completa sus cuatro estaciones.';
         if (!progress.simulationCompleted) return 'Accede al Laboratorio de simulación.';
         if (!progress.approved) return 'Entra a la Sala de evaluación y demuestra lo aprendido.';
         return 'Tu recorrido está completo. Puedes descargar el certificado en la sala de evaluación.';
@@ -104,6 +118,7 @@ export default function CampusPage() {
     const activeContent = useTrainingStore((state) => state.activeContent);
     const activeNpcSpeech = useTrainingStore((state) => state.activeNpcSpeech);
     const setActiveContent = useTrainingStore((state) => state.setActiveContent);
+    const setActiveNpcSpeech = useTrainingStore((state) => state.setActiveNpcSpeech);
     const completedContentIds = useTrainingStore((state) => state.completedContentIds);
     const setCompletedContentIds = useTrainingStore((state) => state.setCompletedContentIds);
     const [savedProgress, setSavedProgress] = useState<CampusProgressRecord | null>(null);
@@ -115,12 +130,14 @@ export default function CampusPage() {
     const [cameraMode, setCameraMode] = useState<CampusCameraMode>('third-person');
     const [quality, setQuality] = useState<'high' | 'adaptive'>('high');
     const [controlsOpen, setControlsOpen] = useState(false);
+    const [npcSpeechSpeed, setNpcSpeechSpeed] = useState<NpcSpeechSpeed>(getSavedNpcSpeechSpeed);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const locationEventIdsRef = useRef(new Map<string, string>());
     const locationSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
     const visitStartedAtRef = useRef(0);
     const baseDurationRef = useRef(0);
     const portalTransitionLockedUntilRef = useRef(0);
+    const cameraModeBeforeTrainingRef = useRef<CampusCameraMode>('third-person');
 
     const completedStationIds = useMemo(
         () => getCompletedStationIds(contents, completedContentIds),
@@ -156,6 +173,7 @@ export default function CampusPage() {
         campusProgress,
         completedStationIds,
     ), [campusProgress, completedStationIds, zoneId]);
+
     const objective = useMemo(
         () => getObjective(zoneId, campusProgress, completedStationIds),
         [campusProgress, completedStationIds, zoneId],
@@ -164,6 +182,12 @@ export default function CampusPage() {
         ? completedContentIds.includes(activeContent._id)
         : false;
     const paused = Boolean(activeContent || activeExperience);
+    const conversationFocusTarget = useMemo(
+        () => activeContent
+            ? getTrainingGuideFocusPosition(activeContent.interactionObjectId) ?? null
+            : null,
+        [activeContent],
+    );
     const audio = useCampusAudio(zoneId);
     const narration = useNpcNarration({
         speech: activeNpcSpeech,
@@ -173,6 +197,10 @@ export default function CampusPage() {
         voiceVolume: audio.voiceVolume,
         onDuckedChange: audio.setDucked,
     });
+
+    useEffect(() => {
+        saveNpcSpeechSpeed(npcSpeechSpeed);
+    }, [npcSpeechSpeed]);
 
     const getDurationSeconds = useCallback(() => (
         baseDurationRef.current
@@ -293,6 +321,7 @@ export default function CampusPage() {
             setActiveExperience(null);
             setActiveContent(null);
             setCameraMode('third-person');
+            cameraModeBeforeTrainingRef.current = 'third-person';
             setQuality('high');
         });
         return () => window.cancelAnimationFrame(frame);
@@ -304,13 +333,19 @@ export default function CampusPage() {
         return () => window.clearTimeout(timeout);
     }, [error]);
 
+    const restoreTrainingCamera = useCallback(() => {
+        setCameraMode(cameraModeBeforeTrainingRef.current);
+        window.requestAnimationFrame(() => canvasRef.current?.focus({ preventScroll: true }));
+    }, []);
+
     const closePanel = useCallback(() => {
+        if (activeContent) restoreTrainingCamera();
         setActiveContent(null);
         setActiveExperience(null);
         void refreshProgress().catch((requestError: unknown) => {
             setError(getErrorMessage(requestError, 'No se pudo actualizar el progreso.'));
         });
-    }, [refreshProgress, setActiveContent]);
+    }, [activeContent, refreshProgress, restoreTrainingCamera, setActiveContent]);
 
     useEffect(() => {
         if (paused || loading) return undefined;
@@ -330,6 +365,12 @@ export default function CampusPage() {
     }, [activeContent]);
 
     const interactWithTarget = useCallback((target: CampusInteractionTarget) => {
+        if (!targets.some(({ id }) => id === target.id)) {
+            setNearbyTarget(null);
+            setError('');
+            return;
+        }
+
         if (nearbyTarget?.id !== target.id) {
             audio.playEffect('denied');
             setError('Acércate al objeto antes de interactuar.');
@@ -371,6 +412,8 @@ export default function CampusPage() {
             }
             audio.setNarrationEnabled(true);
             void audio.start();
+            cameraModeBeforeTrainingRef.current = cameraMode;
+            setCameraMode('first-person');
             setActiveContent(content);
             void interactionSystem.registerInteraction(
                 target.id,
@@ -380,21 +423,47 @@ export default function CampusPage() {
             );
             return;
         }
+        if (target.kind === 'campus_guide') {
+            if (activeNpcSpeech?.stationId === CAMPUS_GUIDE_OBJECT_ID) {
+                setActiveNpcSpeech(null);
+                return;
+            }
+            audio.setNarrationEnabled(true);
+            void audio.start();
+            setActiveNpcSpeech({
+                stationId: CAMPUS_GUIDE_OBJECT_ID,
+                bubbleId: CAMPUS_GUIDE_BUBBLE_ID,
+                kind: 'greeting',
+                label: 'Orientación del campus',
+                visibleText: CAMPUS_GUIDE_DIALOGUE,
+                fullText: CAMPUS_GUIDE_DIALOGUE,
+                typing: false,
+            });
+            return;
+        }
         if (target.kind === 'simulation_terminal') setActiveExperience('simulation');
         if (target.kind === 'evaluation_terminal') setActiveExperience('evaluation');
         if (target.kind === 'certificate_kiosk') setActiveExperience('certificate');
     }, [
         audio,
+        activeNpcSpeech?.stationId,
+        cameraMode,
         contents,
         getDurationSeconds,
         navigate,
         nearbyTarget,
         setActiveContent,
+        setActiveNpcSpeech,
+        targets,
         zoneId,
     ]);
 
     const handleNearbyTargetChange = useCallback((target: CampusInteractionTarget | null) => {
         setNearbyTarget(target);
+        if (activeNpcSpeech?.stationId === CAMPUS_GUIDE_OBJECT_ID
+            && target?.id !== CAMPUS_GUIDE_OBJECT_ID) {
+            setActiveNpcSpeech(null);
+        }
         if (!target?.unlocked || target.kind === 'portal') return;
         void interactionSystem.registerInteraction(
             target.id,
@@ -404,7 +473,7 @@ export default function CampusPage() {
         ).catch((requestError: unknown) => {
             console.warn('No se pudo registrar el sensor de proximidad.', requestError);
         });
-    }, [getDurationSeconds, zoneId]);
+    }, [activeNpcSpeech?.stationId, getDurationSeconds, setActiveNpcSpeech, zoneId]);
 
     const toggleCamera = useCallback(() => {
         if (paused) return;
@@ -447,13 +516,15 @@ export default function CampusPage() {
 
     useEffect(() => {
         const handlePointerLockChange = () => {
-            if (cameraMode === 'first-person' && document.pointerLockElement !== canvasRef.current) {
+            if (cameraMode === 'first-person'
+                && !activeContent
+                && document.pointerLockElement !== canvasRef.current) {
                 setCameraMode('third-person');
             }
         };
         document.addEventListener('pointerlockchange', handlePointerLockChange);
         return () => document.removeEventListener('pointerlockchange', handlePointerLockChange);
-    }, [cameraMode]);
+    }, [activeContent, cameraMode]);
 
     const completeActiveContent = async () => {
         if (!activeContent) return;
@@ -471,6 +542,7 @@ export default function CampusPage() {
             ) as CampusProgressRecord;
             setSavedProgress((current) => ({ ...current, ...nextProgress } as CampusProgressRecord));
             setCompletedContentIds(nextProgress.completedContents);
+            restoreTrainingCamera();
             setActiveContent(null);
             audio.playEffect('confirm');
             window.requestAnimationFrame(() => canvasRef.current?.focus({ preventScroll: true }));
@@ -510,7 +582,7 @@ export default function CampusPage() {
             <div className={`campus-world-shell ${paused ? 'is-paused' : ''}`} aria-hidden={paused}>
                 <SceneErrorBoundary>
                     <CampusWorld
-                        key={`${zoneId}:${spawn.id}`}
+                        key={`${zoneId}:${spawn.id}:${TRAINING_INTERACTION_OBJECT_IDS.join(':')}`}
                         zoneId={zoneId}
                         spawn={spawn}
                         avatarId={session.participant.avatarId}
@@ -520,6 +592,7 @@ export default function CampusPage() {
                         movementRef={movementRef}
                         cameraMode={cameraMode}
                         paused={paused}
+                        conversationFocusTarget={conversationFocusTarget}
                         nearbyTargetId={nearbyTarget?.id ?? null}
                         onNearbyTargetChange={handleNearbyTargetChange}
                         onInteract={interactWithTarget}
@@ -566,6 +639,8 @@ export default function CampusPage() {
                     onMutedChange={audio.setMuted}
                     onAmbientVolumeChange={audio.setAmbientVolume}
                     onVoiceVolumeChange={audio.setVoiceVolume}
+                    speechSpeed={npcSpeechSpeed}
+                    onSpeechSpeedChange={setNpcSpeechSpeed}
                 />
             )}
 
@@ -579,8 +654,7 @@ export default function CampusPage() {
                     onClose={closePanel}
                     narration={narration}
                     audioStarted={audio.started}
-                    voiceVolume={audio.voiceVolume}
-                    onVoiceVolumeChange={audio.setVoiceVolume}
+                    speechSpeed={npcSpeechSpeed}
                 />
             )}
 

@@ -4,39 +4,32 @@ export const MIN_PASSING_SCORE = 70;
 
 export const TRAINING_STATIONS = [
     {
-        position: [-3.25, -0.45, -1.25],
+        position: [-3.35, -0.45, -3.1],
         id: 'obj_manual',
         title: 'Políticas y convivencia',
         variant: 'manual',
-        guide: { name: 'Sofía Andrade', role: 'Guía de Talento Humano', color: '#4f46e5' },
+        guide: { name: 'Sofía Andrade', role: 'Guía de Talento Humano', color: '#4f46e5', imageUrl: '/images/people/sofia-andrade.webp', avatarId: 'avatar_02' },
     },
     {
-        position: [0, -0.45, -3.1],
+        position: [3.35, -0.45, -3.1],
         id: 'obj_rrhh',
         title: 'Departamentos y personas',
         variant: 'folder',
-        guide: { name: 'Elena Torres', role: 'Guía de la organización', color: '#0f766e' },
+        guide: { name: 'Elena Torres', role: 'Guía de la organización', color: '#0f766e', imageUrl: '/images/people/elena-torres.webp', avatarId: 'avatar_03' },
     },
     {
-        position: [3.25, -0.45, -1.25],
+        position: [3.35, -0.45, 3.1],
         id: 'obj_funciones',
         title: 'Funciones de tu puesto',
         variant: 'board',
-        guide: { name: 'Carlos Méndez', role: 'Supervisor de Operaciones', color: '#b45309' },
+        guide: { name: 'Carlos Méndez', role: 'Supervisor de Operaciones', color: '#b45309', imageUrl: '/images/people/carlos-mendez.webp', avatarId: 'avatar_01' },
     },
     {
-        position: [3.1, -0.45, 2.25],
+        position: [-3.35, -0.45, 3.1],
         id: 'obj_seguridad',
         title: 'Red de apoyo',
         variant: 'shield',
-        guide: { name: 'Valeria León', role: 'Guía de Seguridad y Salud', color: '#be123c' },
-    },
-    {
-        position: [-3.1, -0.45, 2.25],
-        id: 'obj_examen',
-        title: 'Reto del primer día',
-        variant: 'terminal',
-        guide: { name: 'Diego Ruiz', role: 'Mentor de integración', color: '#0369a1' },
+        guide: { name: 'Valeria León', role: 'Guía de Seguridad y Salud', color: '#be123c', imageUrl: '/images/people/valeria-leon.webp', avatarId: 'avatar_02' },
     },
 ] as const;
 

@@ -1,4 +1,5 @@
 import type { SpeechCapabilities, TranscriptionResult } from '../../shared/speech';
+import { CAMPUS_GUIDE_OBJECT_ID } from '../../shared/campus';
 import { apiFetch } from '../api/apiClient';
 import { APP_CONFIG } from '../config/appConfig';
 
@@ -23,10 +24,11 @@ function isTranscriptionResult(value: unknown): value is TranscriptionResult {
 }
 
 function narrationPath(stationId: string, bubbleId: string): string {
+    const zoneId = stationId === CAMPUS_GUIDE_OBJECT_ID ? 'lobby' : 'induction-office';
     const query = new URLSearchParams({
         moduleVersion: String(APP_CONFIG.TRAINING_MODULE_VERSION),
         worldVersion: String(APP_CONFIG.CAMPUS_WORLD_VERSION),
-        zoneId: 'induction-office',
+        zoneId,
     });
     return `/speech/narrations/${encodeURIComponent(APP_CONFIG.TRAINING_MODULE_ID)}/${encodeURIComponent(stationId)}/${encodeURIComponent(bubbleId)}?${query}`;
 }

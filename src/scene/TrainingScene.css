@@ -120,8 +120,7 @@
     border-color: #22c55e;
 }
 
-.station-dialogue-speaker,
-.station-dialogue-bubble > strong {
+.station-dialogue-speaker {
     display: block;
 }
 
@@ -132,11 +131,6 @@
     font-weight: 900;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-}
-
-.station-dialogue-bubble > strong {
-    margin-bottom: 0.38rem;
-    font-size: 0.86rem;
 }
 
 .station-dialogue-bubble p {

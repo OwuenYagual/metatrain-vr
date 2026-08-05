@@ -82,7 +82,7 @@ async function getEligibleProgress(
 
     if (!progress || !requirements.eligible) {
         res.status(409).json({
-            error: 'Completa las cinco actividades y la simulación antes de iniciar la evaluación.',
+            error: 'Completa las cuatro actividades y la simulación antes de iniciar la evaluación.',
             requirements,
         });
         return null;
@@ -165,11 +165,6 @@ router.post('/:moduleId/submit', evaluationSubmitRateLimit, async (req: Request,
 
         const progress = await getEligibleProgress(req.auth!.id, moduleId, res);
         if (!progress) return;
-        if (progress.status === 'approved') {
-            res.status(409).json({ error: 'La evaluación ya fue aprobada.' });
-            return;
-        }
-
         const questions = await getActiveQuestions(moduleId);
         const scoreResult = calculateEvaluationScore(
             questions.map((question) => ({
@@ -227,14 +222,7 @@ router.post('/:moduleId/submit', evaluationSubmitRateLimit, async (req: Request,
             if (!updatedProgress) {
                 const current = await TrainingProgress.findById(progress._id);
                 if (current?.status === 'approved' && scoreResult.value.status === 'failed') {
-                    await EvaluationResult.deleteOne({ _id: result._id });
-                    const approvedResult = await EvaluationResult.findOne({
-                        participantId: req.auth!.id,
-                        moduleId,
-                        status: 'approved',
-                    }).sort({ score: -1, createdAt: -1, _id: -1 });
-                    if (!approvedResult) throw new Error('APPROVED_RESULT_NOT_FOUND');
-                    res.json({ result: evaluationSummary(approvedResult) });
+                    res.status(201).json({ result: evaluationSummary(result) });
                     return;
                 }
                 if (!current || current.status !== 'approved') {

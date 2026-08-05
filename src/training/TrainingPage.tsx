@@ -11,6 +11,7 @@ import { progressService } from '../progress/progressService';
 import { calculateContentProgress, getCompletedStationIds } from '../progress/contentProgress';
 import { isTrainingStationUnlocked, TRAINING_STATIONS } from '../../shared/trainingModule';
 import InductionActivityPanel from '../induction/InductionActivityPanel';
+import { StatusIcon } from '../components/StatusIcon';
 import './TrainingPage.css';
 
 export default function TrainingPage() {
@@ -201,7 +202,9 @@ export default function TrainingPage() {
                                                 opacity: unlocked ? 1 : 0.72,
                                             }}
                                         >
-                                            <span aria-hidden="true">{completed ? '✓' : unlocked ? '●' : '🔒'}</span>{' '}
+                                            <span aria-hidden="true">
+                                                <StatusIcon name={completed ? 'check' : unlocked ? 'active' : 'lock'} />
+                                            </span>{' '}
                                             {content.title}
                                             <span style={{ fontSize: '0.85rem' }}> — {status}</span>
                                         </button>

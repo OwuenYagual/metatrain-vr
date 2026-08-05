@@ -11,7 +11,6 @@ const contents = [
     { interactionObjectId: 'obj_rrhh', title: 'Departamentos y personas', body: 'Explora el organigrama, las personas de referencia y los canales de cada departamento.', order: 2 },
     { interactionObjectId: 'obj_funciones', title: 'Funciones de tu puesto', body: 'Organiza las responsabilidades del Analista de Operaciones durante una jornada.', order: 3 },
     { interactionObjectId: 'obj_seguridad', title: 'Red de apoyo', body: 'Identifica el departamento correcto para resolver necesidades laborales, técnicas y de seguridad.', order: 4 },
-    { interactionObjectId: 'obj_examen', title: 'Reto del primer día', body: 'Construye una tarjeta práctica con las funciones que aplicarás en tu puesto.', order: 5 },
 ];
 
 const questions = [
@@ -25,6 +24,7 @@ const questions = [
 async function seed() {
     await mongoose.connect(env.mongoUri);
 
+    await TrainingContent.updateMany({ moduleId }, { $set: { active: false } });
     await Question.updateMany({ moduleId }, { $set: { active: false } });
 
     for (const content of contents) {

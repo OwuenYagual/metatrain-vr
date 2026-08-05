@@ -12,13 +12,17 @@ import {
     type Object3D,
 } from 'three';
 import {
+    CAMPUS_GUIDE_OBJECT_ID,
+    CAMPUS_GUIDE_POSITION,
     type CampusProgressState,
     type CampusZoneId,
     type Vector3Tuple,
 } from '../../shared/campus';
 import { TRAINING_STATIONS } from '../../shared/trainingModule';
+import type { AvatarId } from '../auth/authService';
 import { OfficeStationModel } from '../scene/OfficeEnvironment';
 import { useTrainingStore } from '../store/useTrainingStore';
+import { CampusAvatar } from './CampusAvatar';
 import {
     getTrainingStationPosition,
     type CampusInteractionTarget,
@@ -74,6 +78,7 @@ function RoomShell({ floor, wall }: { floor: string; wall: string }) {
                 <CuboidCollider args={[0.12, 1.65, 5.25]} position={[5.25, 1.65, 0]} />
                 <CuboidCollider args={[5.25, 1.65, 0.12]} position={[0, 1.65, -5.25]} />
                 <CuboidCollider args={[5.25, 1.65, 0.12]} position={[0, 1.65, 5.25]} />
+                <CuboidCollider args={[5.25, 0.08, 5.25]} position={[0, 3.38, 0]} />
             </RigidBody>
             <mesh position={[0, -0.14, 0]} receiveShadow>
                 <boxGeometry args={[10.5, 0.28, 10.5]} />
@@ -95,6 +100,28 @@ function RoomShell({ floor, wall }: { floor: string; wall: string }) {
                 <boxGeometry args={[10.5, 3.3, 0.24]} />
                 <meshStandardMaterial color={wall} roughness={0.82} />
             </mesh>
+            <mesh position={[0, 3.38, 0]} receiveShadow userData={{ cameraBlocker: true }}>
+                <boxGeometry args={[10.5, 0.16, 10.5]} />
+                <meshStandardMaterial color={wall} roughness={0.88} />
+            </mesh>
+            {[
+                [-2.55, -2.55],
+                [0, -2.55],
+                [2.55, -2.55],
+                [-2.55, 2.55],
+                [0, 2.55],
+                [2.55, 2.55],
+            ].map(([x, z]) => (
+                <mesh key={`${x}-${z}`} position={[x, 3.285, z]}>
+                    <boxGeometry args={[1.35, 0.035, 0.5]} />
+                    <meshStandardMaterial
+                        color="#f8fafc"
+                        emissive="#d9f5ff"
+                        emissiveIntensity={0.72}
+                        roughness={0.42}
+                    />
+                </mesh>
+            ))}
         </>
     );
 }
@@ -135,47 +162,66 @@ function InstancedColumns({ color }: { color: string }) {
 }
 
 function GuideNpc({
-    color,
+    avatarId,
     position,
     label,
     stationId,
+    interactionTarget,
+    nearby = false,
+    onInteract,
 }: {
-    color: string;
+    avatarId: AvatarId;
     position: Vector3Tuple;
     label: string;
     stationId?: string;
+    interactionTarget?: CampusInteractionTarget;
+    nearby?: boolean;
+    onInteract?: (target: CampusInteractionTarget) => void;
 }) {
-    const groupRef = useRef<Group>(null);
+    const activeContent = useTrainingStore((state) => state.activeContent);
     const activeSpeech = useTrainingStore((state) => state.activeNpcSpeech);
+    const [hovered, setHovered] = useState(false);
     const speaking = Boolean(stationId && activeSpeech?.stationId === stationId);
-    useFrame(({ clock }) => {
-        if (groupRef.current) groupRef.current.position.y = Math.sin(clock.elapsedTime * 1.8) * 0.012;
-    });
+    const interactive = Boolean(interactionTarget && onInteract);
 
     return (
-        <group ref={groupRef} position={[position[0], position[1], position[2]]}>
-            <mesh position={[-0.12, 0.28, 0]} castShadow>
-                <capsuleGeometry args={[0.075, 0.34, 5, 8]} />
-                <meshStandardMaterial color="#25324a" />
-            </mesh>
-            <mesh position={[0.12, 0.28, 0]} castShadow>
-                <capsuleGeometry args={[0.075, 0.34, 5, 8]} />
-                <meshStandardMaterial color="#25324a" />
-            </mesh>
-            <mesh position={[0, 0.84, 0]} castShadow>
-                <capsuleGeometry args={[0.23, 0.55, 6, 10]} />
-                <meshStandardMaterial color={color} roughness={0.8} />
-            </mesh>
-            <mesh position={[0, 1.43, 0]} castShadow>
-                <sphereGeometry args={[0.23, 14, 10]} />
-                <meshStandardMaterial color="#c98e6c" roughness={0.85} />
-            </mesh>
-            <mesh position={[0, 1.55, 0.035]} scale={[1.02, 0.48, 0.82]} castShadow>
-                <sphereGeometry args={[0.235, 12, 8]} />
-                <meshStandardMaterial color="#2b211f" roughness={0.94} />
-            </mesh>
-            {!speaking && (
-                <Html position={[0, 1.92, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+        <group
+            position={[position[0], position[1], position[2]]}
+            onClick={interactive ? (event) => {
+                event.stopPropagation();
+                onInteract?.(interactionTarget!);
+            } : undefined}
+            onPointerOver={interactive ? (event) => {
+                event.stopPropagation();
+                setHovered(true);
+                document.body.style.cursor = 'pointer';
+            } : undefined}
+            onPointerOut={interactive ? () => {
+                setHovered(false);
+                document.body.style.cursor = 'auto';
+            } : undefined}
+        >
+            {interactionTarget && (
+                <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                    <ringGeometry args={[0.52, 0.64, 24]} />
+                    <meshStandardMaterial
+                        color="#38bdf8"
+                        emissive="#0284c7"
+                        emissiveIntensity={nearby || hovered ? 0.8 : 0.3}
+                    />
+                </mesh>
+            )}
+            <group position={[0, 0.88, 0]}>
+                <CampusAvatar avatarId={avatarId} motion="idle" />
+            </group>
+            {!activeContent && !speaking && (
+                <Html
+                    position={[0, 1.92, 0]}
+                    center
+                    distanceFactor={8}
+                    zIndexRange={[10, 6]}
+                    style={{ pointerEvents: 'none' }}
+                >
                     <span className="campus-npc-label">{label}</span>
                 </Html>
             )}
@@ -204,9 +250,8 @@ function CampusNpcDialogueBubble({
                 className={`campus-npc-dialogue-bubble is-${speech.kind}`}
                 key={speech.bubbleId}
                 role="status"
-                aria-label={`${speech.label}: ${speech.fullText}`}
+                aria-label={speech.fullText}
             >
-                <strong>{speech.label}</strong>
                 <p aria-hidden="true">
                     {speech.visibleText}
                     {speech.typing && <span className="campus-npc-dialogue-cursor">▌</span>}
@@ -296,14 +341,19 @@ function PortalVisual({
 function InteractionBeacon({
     target,
     nearby,
+    hideStationTitle,
     onInteract,
 }: {
     target: CampusInteractionTarget;
     nearby: boolean;
+    hideStationTitle: boolean;
     onInteract: (target: CampusInteractionTarget) => void;
 }) {
     const rootRef = useRef<Group>(null);
     const [hovered, setHovered] = useState(false);
+    const showStationTitle = target.kind === 'simulation_terminal'
+        || target.kind === 'evaluation_terminal'
+        || target.kind === 'certificate_kiosk';
     useFrame(({ clock }) => {
         if (!rootRef.current) return;
         rootRef.current.position.y = 0.12 + Math.sin(clock.elapsedTime * 2.5) * 0.04;
@@ -312,6 +362,18 @@ function InteractionBeacon({
     const color = target.unlocked ? '#38bdf8' : '#94a3b8';
     return (
         <group position={[target.position[0], target.position[1], target.position[2]]}>
+            {showStationTitle && !hideStationTitle && (
+                <Html
+                    position={[0, 2.2, 0]}
+                    center
+                    distanceFactor={8}
+                    style={{ pointerEvents: 'none' }}
+                >
+                    <span className={`campus-world-label is-station-title ${target.unlocked ? '' : 'is-locked'}`}>
+                        {target.label}
+                    </span>
+                </Html>
+            )}
             <group ref={rootRef}>
                 <mesh
                     position={[0, 1.65, 0]}
@@ -341,10 +403,92 @@ function InteractionBeacon({
     );
 }
 
-function LobbyEnvironment() {
+function InductionWallPanel({
+    position,
+    rotation,
+    accent,
+}: {
+    position: Vector3Tuple;
+    rotation: Vector3Tuple;
+    accent: string;
+}) {
+    return (
+        <group position={position} rotation={rotation}>
+            <mesh castShadow>
+                <boxGeometry args={[1.55, 0.82, 0.055]} />
+                <meshStandardMaterial color="#f8fafc" roughness={0.68} />
+            </mesh>
+            <mesh position={[-0.58, 0, 0.034]}>
+                <boxGeometry args={[0.14, 0.6, 0.025]} />
+                <meshStandardMaterial color={accent} roughness={0.55} />
+            </mesh>
+            {[0.16, -0.02, -0.2].map((y, index) => (
+                <mesh key={y} position={[0.18, y, 0.034]}>
+                    <boxGeometry args={[index === 2 ? 0.58 : 0.76, 0.055, 0.025]} />
+                    <meshStandardMaterial color={index === 0 ? '#475569' : '#94a3b8'} roughness={0.72} />
+                </mesh>
+            ))}
+        </group>
+    );
+}
+
+function InductionWallDecor() {
     return (
         <>
-            <RoomShell floor="#cbd5e1" wall="#e7eef7" />
+            <group position={[0, 2.42, -5.105]}>
+                <mesh castShadow>
+                    <boxGeometry args={[3.8, 0.96, 0.06]} />
+                    <meshStandardMaterial color="#243247" roughness={0.62} />
+                </mesh>
+                <mesh position={[-1.48, 0, 0.045]} rotation={[0, 0, Math.PI / 4]}>
+                    <boxGeometry args={[0.42, 0.42, 0.035]} />
+                    <meshStandardMaterial color="#22b8cf" emissive="#0e7490" emissiveIntensity={0.18} />
+                </mesh>
+                <mesh position={[-1.48, 0, 0.068]} rotation={[0, 0, Math.PI / 4]}>
+                    <boxGeometry args={[0.2, 0.2, 0.02]} />
+                    <meshStandardMaterial color="#f8fafc" />
+                </mesh>
+                {[0.18, -0.06, -0.3].map((y, index) => (
+                    <mesh key={y} position={[0.48, y, 0.045]}>
+                        <boxGeometry args={[index === 0 ? 1.9 : 2.35, 0.08, 0.035]} />
+                        <meshStandardMaterial color={index === 0 ? '#f8fafc' : '#8293a8'} roughness={0.68} />
+                    </mesh>
+                ))}
+            </group>
+
+            <InductionWallPanel position={[-5.105, 2.18, -2.35]} rotation={[0, Math.PI / 2, 0]} accent="#4f46e5" />
+            <InductionWallPanel position={[-5.105, 2.18, 2.35]} rotation={[0, Math.PI / 2, 0]} accent="#0f766e" />
+            <InductionWallPanel position={[5.105, 2.18, -2.35]} rotation={[0, -Math.PI / 2, 0]} accent="#b45309" />
+            <InductionWallPanel position={[5.105, 2.18, 2.35]} rotation={[0, -Math.PI / 2, 0]} accent="#be123c" />
+
+            <mesh position={[0, 0.62, -5.1]}>
+                <boxGeometry args={[10.05, 0.08, 0.055]} />
+                <meshStandardMaterial color="#22b8cf" roughness={0.62} />
+            </mesh>
+            <mesh position={[-5.1, 0.62, 0]} rotation={[0, Math.PI / 2, 0]}>
+                <boxGeometry args={[10.05, 0.08, 0.055]} />
+                <meshStandardMaterial color="#4f46e5" roughness={0.62} />
+            </mesh>
+            <mesh position={[5.1, 0.62, 0]} rotation={[0, Math.PI / 2, 0]}>
+                <boxGeometry args={[10.05, 0.08, 0.055]} />
+                <meshStandardMaterial color="#0f766e" roughness={0.62} />
+            </mesh>
+        </>
+    );
+}
+
+function LobbyEnvironment({
+    guideTarget,
+    nearby,
+    onInteract,
+}: {
+    guideTarget?: CampusInteractionTarget;
+    nearby: boolean;
+    onInteract: (target: CampusInteractionTarget) => void;
+}) {
+    return (
+        <>
+            <RoomShell floor="#aeb8c2" wall="#d7e6f3" />
             <InstancedColumns color="#64748b" />
             <RigidBody type="fixed" colliders={false}>
                 <CuboidCollider args={[1.65, 0.55, 0.48]} position={[0, 0.55, 0.3]} />
@@ -357,7 +501,15 @@ function LobbyEnvironment() {
                 <boxGeometry args={[2.5, 0.05, 0.72]} />
                 <meshStandardMaterial color="#67e8f9" emissive="#0891b2" emissiveIntensity={0.25} />
             </mesh>
-            <GuideNpc color="#2563eb" position={[0, 0, -0.7]} label="Guía del campus" />
+            <GuideNpc
+                avatarId="avatar_01"
+                position={CAMPUS_GUIDE_POSITION}
+                label="Guía del campus"
+                stationId={CAMPUS_GUIDE_OBJECT_ID}
+                interactionTarget={guideTarget}
+                nearby={nearby}
+                onInteract={onInteract}
+            />
             <mesh position={[0, 2.45, -5.08]}>
                 <boxGeometry args={[4.4, 0.78, 0.08]} />
                 <meshStandardMaterial color="#0f172a" emissive="#0369a1" emissiveIntensity={0.25} />
@@ -369,27 +521,38 @@ function LobbyEnvironment() {
 function InductionEnvironment({ completedStationIds }: { completedStationIds: readonly string[] }) {
     return (
         <>
-            <RoomShell floor="#dce3ec" wall="#f8fafc" />
+            <RoomShell floor="#bfa98b" wall="#f1e6d6" />
             <InstancedColumns color="#94a3b8" />
+            <InductionWallDecor />
             {TRAINING_STATIONS.slice(0, -1).map((station, index) => {
                 if (!completedStationIds.includes(station.id)) return null;
                 const current = getTrainingStationPosition(station.id)!;
                 const next = getTrainingStationPosition(TRAINING_STATIONS[index + 1].id)!;
                 return (
-                    <Line
-                        key={`training-route-${station.id}`}
-                        points={[
-                            [current[0], 0.035, current[2]],
-                            [next[0], 0.035, next[2]],
-                        ]}
-                        color="#22c55e"
-                        lineWidth={2.2}
-                        dashed
-                        dashSize={0.24}
-                        gapSize={0.15}
-                        transparent
-                        opacity={0.92}
-                    />
+                    <group key={`training-route-${station.id}`}>
+                        <Line
+                            points={[
+                                [current[0], 0.032, current[2]],
+                                [next[0], 0.032, next[2]],
+                            ]}
+                            color="#172554"
+                            lineWidth={7}
+                            dashed
+                            dashSize={0.3}
+                            gapSize={0.12}
+                        />
+                        <Line
+                            points={[
+                                [current[0], 0.04, current[2]],
+                                [next[0], 0.04, next[2]],
+                            ]}
+                            color="#22d3ee"
+                            lineWidth={4}
+                            dashed
+                            dashSize={0.3}
+                            gapSize={0.12}
+                        />
+                    </group>
                 );
             })}
             {TRAINING_STATIONS.map((station) => {
@@ -408,7 +571,7 @@ function InductionEnvironment({ completedStationIds }: { completedStationIds: re
                             <OfficeStationModel variant={station.variant} />
                         </group>
                         <GuideNpc
-                            color={station.guide.color}
+                            avatarId={station.guide.avatarId}
                             position={[0.92, 0, 0.2]}
                             label={station.title}
                             stationId={station.id}
@@ -455,11 +618,95 @@ function SimulationEnvironment({ lowQuality }: { lowQuality: boolean }) {
     );
 }
 
+function AssessmentWallDecor({ approved }: { approved: boolean }) {
+    const accent = approved ? '#22c55e' : '#3b82f6';
+    const accentDark = approved ? '#166534' : '#1d4ed8';
+
+    return (
+        <>
+            <group position={[0, 2.35, -5.105]}>
+                <mesh castShadow>
+                    <boxGeometry args={[3.9, 1.02, 0.06]} />
+                    <meshStandardMaterial color="#1e293b" roughness={0.6} />
+                </mesh>
+                <mesh position={[-1.42, 0, 0.05]}>
+                    <ringGeometry args={[0.28, 0.38, 24]} />
+                    <meshStandardMaterial color={accent} emissive={accentDark} emissiveIntensity={0.35} />
+                </mesh>
+                {approved ? (
+                    <group position={[-1.42, -0.02, 0.075]}>
+                        <mesh position={[-0.08, -0.04, 0]} rotation={[0, 0, -0.72]}>
+                            <boxGeometry args={[0.08, 0.24, 0.025]} />
+                            <meshStandardMaterial color="#dcfce7" />
+                        </mesh>
+                        <mesh position={[0.08, 0.02, 0]} rotation={[0, 0, 0.72]}>
+                            <boxGeometry args={[0.08, 0.38, 0.025]} />
+                            <meshStandardMaterial color="#dcfce7" />
+                        </mesh>
+                    </group>
+                ) : (
+                    <group position={[-1.42, 0, 0.075]}>
+                        <mesh position={[0.04, 0.09, 0]} rotation={[0, 0, -0.55]}>
+                            <boxGeometry args={[0.09, 0.25, 0.025]} />
+                            <meshStandardMaterial color="#dbeafe" />
+                        </mesh>
+                        <mesh position={[-0.04, -0.09, 0]}>
+                            <boxGeometry args={[0.09, 0.14, 0.025]} />
+                            <meshStandardMaterial color="#dbeafe" />
+                        </mesh>
+                        <mesh position={[-0.04, -0.23, 0]}>
+                            <circleGeometry args={[0.055, 12]} />
+                            <meshStandardMaterial color="#dbeafe" />
+                        </mesh>
+                    </group>
+                )}
+                {[0.2, -0.04, -0.28].map((y, index) => (
+                    <mesh key={y} position={[0.62, y, 0.05]}>
+                        <boxGeometry args={[index === 0 ? 1.75 : 2.2, 0.075, 0.035]} />
+                        <meshStandardMaterial color={index === 0 ? '#f8fafc' : '#94a3b8'} roughness={0.68} />
+                    </mesh>
+                ))}
+            </group>
+
+            {[-1.85, 1.85].map((z, panelIndex) => (
+                <group
+                    key={z}
+                    position={[panelIndex === 0 ? -5.105 : 5.105, 2.12, z]}
+                    rotation={[0, panelIndex === 0 ? Math.PI / 2 : -Math.PI / 2, 0]}
+                >
+                    <mesh castShadow>
+                        <boxGeometry args={[2.05, 0.86, 0.055]} />
+                        <meshStandardMaterial color="#ffffff" roughness={0.72} />
+                    </mesh>
+                    {[0.22, 0, -0.22].map((y) => (
+                        <group key={y} position={[0, y, 0.04]}>
+                            <mesh position={[-0.72, 0, 0]}>
+                                <circleGeometry args={[0.07, 16]} />
+                                <meshStandardMaterial color={accent} emissive={accentDark} emissiveIntensity={0.16} />
+                            </mesh>
+                            <mesh position={[0.18, 0, 0]}>
+                                <boxGeometry args={[1.35, 0.055, 0.025]} />
+                                <meshStandardMaterial color={y === 0.22 ? '#475569' : '#94a3b8'} roughness={0.75} />
+                            </mesh>
+                        </group>
+                    ))}
+                </group>
+            ))}
+
+            <mesh position={[0, 0.64, -5.1]}>
+                <boxGeometry args={[10.05, 0.09, 0.055]} />
+                <meshStandardMaterial color={accent} emissive={accentDark} emissiveIntensity={0.12} />
+            </mesh>
+        </>
+    );
+}
+
 function AssessmentEnvironment({ approved }: { approved: boolean }) {
     return (
         <>
             <RoomShell floor="#e2e8f0" wall="#f1f5f9" />
             <InstancedColumns color={approved ? '#16a34a' : '#64748b'} />
+            <AssessmentWallDecor approved={approved} />
             {[-1.65, 1.65].map((x, index) => (
                 <group key={x} position={[x, 0, -1.25]}>
                     <RigidBody type="fixed" colliders={false}>
@@ -479,10 +726,6 @@ function AssessmentEnvironment({ approved }: { approved: boolean }) {
                     </mesh>
                 </group>
             ))}
-            <mesh position={[0, 2.3, -5.08]}>
-                <circleGeometry args={[0.55, 24]} />
-                <meshStandardMaterial color={approved ? '#4ade80' : '#94a3b8'} emissive={approved ? '#16a34a' : '#475569'} emissiveIntensity={0.5} />
-            </mesh>
         </>
     );
 }
@@ -494,6 +737,7 @@ export function CampusZoneEnvironment({
     targets,
     nearbyTargetId,
     lowQuality,
+    hideStationTitles,
     onInteract,
 }: {
     zoneId: CampusZoneId;
@@ -502,17 +746,26 @@ export function CampusZoneEnvironment({
     targets: readonly CampusInteractionTarget[];
     nearbyTargetId: string | null;
     lowQuality: boolean;
+    hideStationTitles: boolean;
     onInteract: (target: CampusInteractionTarget) => void;
 }) {
+    const campusGuideTarget = targets.find(({ kind }) => kind === 'campus_guide');
+
     return (
         <group name={`zone-${zoneId}`}>
-            {zoneId === 'lobby' && <LobbyEnvironment />}
+            {zoneId === 'lobby' && (
+                <LobbyEnvironment
+                    guideTarget={campusGuideTarget}
+                    nearby={nearbyTargetId === CAMPUS_GUIDE_OBJECT_ID}
+                    onInteract={onInteract}
+                />
+            )}
             {zoneId === 'induction-office' && (
                 <InductionEnvironment completedStationIds={completedStationIds} />
             )}
             {zoneId === 'simulation-lab' && <SimulationEnvironment lowQuality={lowQuality} />}
             {zoneId === 'assessment-room' && <AssessmentEnvironment approved={progress.approved} />}
-            {targets.map((target) => target.kind === 'portal'
+            {targets.filter(({ kind }) => kind !== 'campus_guide').map((target) => target.kind === 'portal'
                 ? (
                     <PortalVisual
                         key={target.id}
@@ -526,6 +779,7 @@ export function CampusZoneEnvironment({
                         key={target.id}
                         target={target}
                         nearby={nearbyTargetId === target.id}
+                        hideStationTitle={hideStationTitles}
                         onInteract={onInteract}
                     />
                 ))}

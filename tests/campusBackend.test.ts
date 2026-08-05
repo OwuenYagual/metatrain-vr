@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+    CAMPUS_GUIDE_OBJECT_ID,
     CAMPUS_MANIFEST,
     createDefaultPlayerLocation,
 } from '../shared/campus';
@@ -19,7 +20,7 @@ import {
 import { SIMULATION_DECISION_IDS, TRAINING_SIMULATION } from '../server/domain/simulation';
 import TrainingProgress, { type ITrainingProgress } from '../server/models/progress.model';
 
-const requiredContents = ['c1', 'c2', 'c3', 'c4', 'c5'];
+const requiredContents = ['c1', 'c2', 'c3', 'c4'];
 
 function progress(overrides: Partial<ITrainingProgress> = {}): ITrainingProgress {
     return {
@@ -73,6 +74,7 @@ test('rechaza objetos usados desde otra zona o antes de desbloquearlos', () => {
     const locked = { trainingCompleted: false, simulationCompleted: false, approved: false };
     const approved = { trainingCompleted: true, simulationCompleted: true, approved: true };
     assert.equal(canUseCampusObject('lobby', 'obj_manual', approved), false);
+    assert.equal(canUseCampusObject('lobby', CAMPUS_GUIDE_OBJECT_ID, locked), true);
     assert.equal(canUseCampusObject('simulation-lab', 'obj_simulation_terminal', locked), false);
     assert.equal(canUseCampusObject('assessment-room', 'obj_certificate_kiosk', approved), true);
 });

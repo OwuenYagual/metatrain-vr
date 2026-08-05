@@ -24,7 +24,6 @@ const contents = [
     ['content-rrhh', 'obj_rrhh', 'Departamentos y personas'],
     ['content-functions', 'obj_funciones', 'Funciones de tu puesto'],
     ['content-security', 'obj_seguridad', 'Red de apoyo'],
-    ['content-exam', 'obj_examen', 'Reto del primer día'],
 ].map(([id, interactionObjectId, title], order) => ({
     _id: id,
     moduleId,
@@ -800,6 +799,9 @@ test('permite reprobar, reintentar, aprobar y emitir el certificado PDF', async 
     expect(download.suggestedFilename()).toBe('certificado-metatrain.pdf');
     await expect(dialog.getByText('META-E2E-2026-0001')).toBeVisible();
     await expect(dialog.getByRole('button', { name: /Descargar certificado nuevamente/i })).toBeVisible();
+    await dialog.getByRole('button', { name: /Volver a realizar la evaluaci/i }).click();
+    await expect(dialog.getByRole('radio')).toHaveCount(4);
+    await expect(dialog.getByText('0 de 2 respondidas')).toBeVisible();
     expect(api.getEvaluationSubmissionCount()).toBe(2);
     expect(api.getCertificateIssueCount()).toBe(1);
     expect(api.getCertificateDownloadCount()).toBe(1);

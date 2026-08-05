@@ -14,6 +14,7 @@ import {
     type CertificateSummary,
 } from '../certificate/certificateService';
 import { useVoiceAnswer } from '../speech/useVoiceAnswer';
+import { StatusIcon } from '../components/StatusIcon';
 import './EvaluationPage.css';
 
 const ignoreMicrophoneState = () => undefined;
@@ -152,7 +153,7 @@ export default function EvaluationPage({
                 {!loading && result && (
                     <section aria-labelledby="evaluation-result-title" style={{ textAlign: 'center', padding: '1rem 0' }}>
                         <p aria-hidden="true" style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>
-                            {result.status === 'approved' ? '✓' : '↻'}
+                            <StatusIcon name={result.status === 'approved' ? 'check' : 'retry'} />
                         </p>
                         <h2 id="evaluation-result-title" style={{ fontSize: '1.7rem' }}>
                             {result.status === 'approved' ? 'Evaluación aprobada' : 'Aún puedes intentarlo nuevamente'}
@@ -188,11 +189,11 @@ export default function EvaluationPage({
                             </section>
                         )}
                         <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.5rem' }}>
-                            {result.status === 'failed' && (
-                                <button type="button" onClick={retryEvaluation} style={{ padding: '0.75rem 1rem', background: '#2563eb', color: '#fff', border: 0, borderRadius: 8, fontWeight: 700 }}>
-                                    Intentar nuevamente
-                                </button>
-                            )}
+                            <button type="button" onClick={retryEvaluation} style={{ padding: '0.75rem 1rem', background: '#2563eb', color: '#fff', border: 0, borderRadius: 8, fontWeight: 700 }}>
+                                {result.status === 'approved'
+                                    ? 'Volver a realizar la evaluación'
+                                    : 'Intentar nuevamente'}
+                            </button>
                         </div>
                     </section>
                 )}
@@ -200,12 +201,12 @@ export default function EvaluationPage({
                 {!loading && !result && questions.length > 0 && (
                     <form onSubmit={submitEvaluation}>
                         <p id="evaluation-instructions" style={{ padding: '0.85rem', background: '#eff6ff', color: '#1e40af', borderRadius: 8 }}>
-                            Selecciona una respuesta por pregunta. También puedes mantener pulsado el micrófono,
-                            decir el número o el texto de una opción y confirmarla. Necesitas {passingScore}% para aprobar.
+                            Mantén pulsado el micrófono, di el número o el texto de una opción y confirma la respuesta
+                            reconocida. Necesitas {passingScore}% para aprobar.
                         </p>
                         {voice.capabilities && !voice.capabilities.transcriptionAvailable && (
                             <p role="status" className="voice-answer-unavailable">
-                                Las respuestas por voz no están configuradas. Los controles manuales siguen disponibles.
+                                Las respuestas por voz no están disponibles en este momento.
                             </p>
                         )}
                         <p aria-live="polite" style={{ margin: '1rem 0', fontWeight: 700 }}>
@@ -217,23 +218,6 @@ export default function EvaluationPage({
                                     <legend style={{ padding: '0 0.4rem', fontWeight: 700 }}>
                                         {questionIndex + 1}. {question.text}
                                     </legend>
-                                    <div style={{ display: 'grid', gap: '0.65rem', marginTop: '0.5rem' }}>
-                                        {question.options.map((option) => (
-                                            <label key={option.id} style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start', padding: '0.7rem', borderRadius: 8, background: answers[question.id] === option.id ? '#dbeafe' : '#f8fafc', cursor: 'pointer' }}>
-                                                <input
-                                                    type="radio"
-                                                    name={`question-${question.id}`}
-                                                    value={option.id}
-                                                    checked={answers[question.id] === option.id}
-                                                    onChange={() => {
-                                                        if (voice.activeQuestionId === question.id) voice.cancel();
-                                                        setAnswers((current) => ({ ...current, [question.id]: option.id }));
-                                                    }}
-                                                />
-                                                <span>{option.text}</span>
-                                            </label>
-                                        ))}
-                                    </div>
                                     <div className="voice-answer-controls">
                                         <button
                                             type="button"
@@ -267,14 +251,23 @@ export default function EvaluationPage({
                                                 }
                                             }}
                                         >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <rect x="9" y="3" width="6" height="11" rx="3" />
+                                                <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" />
+                                            </svg>
+                                        </button>
+
+                                        <p className="voice-answer-status" aria-live="polite">
                                             {voice.activeQuestionId === question.id && voice.status === 'requesting'
                                                 ? 'Permitiendo micrófono…'
                                                 : voice.activeQuestionId === question.id && voice.status === 'listening'
                                                     ? 'Escuchando… suelta para enviar'
                                                     : voice.activeQuestionId === question.id && voice.status === 'processing'
                                                         ? 'Reconociendo respuesta…'
-                                                        : 'Mantener para responder'}
-                                        </button>
+                                                        : answers[question.id]
+                                                            ? 'Respuesta confirmada'
+                                                            : 'Mantén pulsado para responder'}
+                                        </p>
 
                                         {voice.activeQuestionId === question.id && voice.status === 'error' && (
                                             <div role="alert" className="voice-answer-feedback is-error">

@@ -35,8 +35,22 @@ export function getTrainingStationPosition(stationId: string): Vector3Tuple | un
     return STATION_POSITIONS.get(stationId);
 }
 
+export function getTrainingGuideFocusPosition(stationId: string): Vector3Tuple | undefined {
+    const stationPosition = getTrainingStationPosition(stationId);
+    if (!stationPosition) return undefined;
+
+    const rotationY = Math.atan2(-stationPosition[0], -stationPosition[2]);
+    const localX = 0.92;
+    const localZ = 0.2;
+    return [
+        stationPosition[0] + Math.cos(rotationY) * localX + Math.sin(rotationY) * localZ,
+        1.52,
+        stationPosition[2] - Math.sin(rotationY) * localX + Math.cos(rotationY) * localZ,
+    ];
+}
+
 export function getLockedMessage(kind: CampusInteractionKind): string {
-    if (kind === 'simulation_terminal') return 'Completa las cinco estaciones de inducción.';
+    if (kind === 'simulation_terminal') return 'Completa las cuatro estaciones de inducción.';
     if (kind === 'evaluation_terminal') return 'Completa el laboratorio de simulación.';
     if (kind === 'certificate_kiosk') return 'Aprueba la evaluación para emitir tu certificado.';
     if (kind === 'training_station') return 'Completa primero la estación anterior.';

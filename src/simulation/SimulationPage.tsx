@@ -9,6 +9,7 @@ import {
     type SimulationScenario,
     type SimulationSelection,
 } from './simulationService';
+import { StatusIcon } from '../components/StatusIcon';
 import './SimulationPage.css';
 
 export default function SimulationPage() {
@@ -97,17 +98,18 @@ export default function SimulationPage() {
                         </div>
                         <div className="office-zones">
                             {[
-                                { icon: '🔐', name: 'Políticas', time: '08:30' },
-                                { icon: '👥', name: 'Talento Humano', time: '11:00' },
-                                { icon: '📋', name: 'Operaciones', time: '15:30' },
+                                { name: 'Políticas', time: '08:30' },
+                                { name: 'Talento Humano', time: '11:00' },
+                                { name: 'Operaciones', time: '15:30' },
                             ].map((zone, index) => {
                                 const completed = index < progress.completedCount;
                                 const active = index === progress.completedCount && !progress.completed;
                                 return (
                                     <article className={`office-zone ${completed ? 'is-completed' : ''} ${active ? 'is-active' : ''}`} key={zone.name}>
-                                        <span className="office-zone-icon" aria-hidden="true">{zone.icon}</span>
                                         <div><small>{zone.time}</small><strong>{zone.name}</strong></div>
-                                        <span aria-hidden="true">{completed ? '✓' : active ? '→' : '○'}</span>
+                                        <span aria-hidden="true">
+                                            <StatusIcon name={completed ? 'check' : active ? 'active' : 'pending'} />
+                                        </span>
                                     </article>
                                 );
                             })}
@@ -123,7 +125,9 @@ export default function SimulationPage() {
                         {feedback ? (
                             <article className={`decision-consequence ${feedback.recommended ? 'is-positive' : 'is-warning'}`}>
                                 <p className="simulation-eyebrow">Consecuencia de tu acción</p>
-                                <div className="consequence-icon" aria-hidden="true">{feedback.recommended ? '✓' : '↻'}</div>
+                                <div className="consequence-icon" aria-hidden="true">
+                                    <StatusIcon name={feedback.recommended ? 'check' : 'retry'} />
+                                </div>
                                 <h2>{feedback.recommended ? 'Aplicaste la inducción' : 'Hay una opción más segura'}</h2>
                                 <p>{feedback.feedback}</p>
                                 <button type="button" onClick={() => setFeedback(null)}>

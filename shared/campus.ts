@@ -8,6 +8,8 @@ export const CAMPUS_WORLD_ID = 'corporate-campus';
 export const CAMPUS_WORLD_VERSION = 1;
 export const TRAINING_MODULE_VERSION = 1;
 export const CAMPUS_INTERACTION_DISTANCE = 2.2;
+export const CAMPUS_GUIDE_OBJECT_ID = 'obj_campus_guide';
+export const CAMPUS_GUIDE_POSITION = [0, 0, -0.7] as const;
 
 export const CAMPUS_ZONE_IDS = [
     'lobby',
@@ -43,7 +45,7 @@ export type PortalManifest = {
 export type InteractableManifest = {
     id: string;
     label: string;
-    kind: 'training_station' | 'simulation_terminal' | 'evaluation_terminal' | 'certificate_kiosk';
+    kind: 'campus_guide' | 'training_station' | 'simulation_terminal' | 'evaluation_terminal' | 'certificate_kiosk';
     position: Vector3Tuple;
     unlockRule: UnlockRule;
 };
@@ -135,12 +137,20 @@ export const CAMPUS_MANIFEST: WorldManifest = {
                     unlockRule: SIMULATION_COMPLETE,
                 },
             ],
-            interactables: [],
+            interactables: [
+                {
+                    id: CAMPUS_GUIDE_OBJECT_ID,
+                    label: 'Hablar con el guía del campus',
+                    kind: 'campus_guide',
+                    position: CAMPUS_GUIDE_POSITION,
+                    unlockRule: ALWAYS,
+                },
+            ],
         },
         {
             id: 'induction-office',
             title: 'Centro de inducción',
-            description: 'Oficina con las cinco estaciones formativas y sus guías.',
+            description: 'Oficina con las cuatro estaciones formativas y sus guías.',
             environment: 'office',
             ambientCue: 'office',
             unlockRule: ALWAYS,

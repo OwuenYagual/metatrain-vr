@@ -68,7 +68,7 @@ if (nodeEnv === 'production' && weakSecret) {
 }
 
 if (nodeEnv !== 'production' && weakSecret) {
-    console.warn('⚠ JWT_SECRET es débil y solo debe utilizarse para desarrollo local.');
+    console.warn('JWT_SECRET es débil y solo debe utilizarse para desarrollo local.');
 }
 
 if (nodeEnv === 'production' && !configuredCorsOrigin) {

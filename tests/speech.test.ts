@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { INDUCTION_ACTIVITIES } from '../shared/inductionActivities';
+import { CAMPUS_GUIDE_OBJECT_ID } from '../shared/campus';
 import {
+    CAMPUS_GUIDE_BUBBLE_ID,
+    CAMPUS_GUIDE_DIALOGUE,
     getNpcVoiceProfile,
     normalizeSpokenText,
     proposeVoiceAnswer,
@@ -12,6 +15,12 @@ import { buildNpcSpeechBubbles } from '../src/induction/npcSpeech';
 import { escapeSsml } from '../server/domain/ssml';
 
 test('cada globo visible tiene una narración autorizada con voz ecuatoriana', () => {
+    const campusGuide = resolveNarration(CAMPUS_GUIDE_OBJECT_ID, CAMPUS_GUIDE_BUBBLE_ID);
+    assert.ok(campusGuide);
+    assert.equal(campusGuide.zoneId, 'lobby');
+    assert.equal(campusGuide.text, CAMPUS_GUIDE_DIALOGUE);
+    assert.match(campusGuide.voice.voiceName, /^es-EC-(Andrea|Luis)Neural$/);
+
     for (const station of TRAINING_STATIONS) {
         const activity = INDUCTION_ACTIVITIES[station.id];
         assert.ok(activity);
@@ -23,6 +32,7 @@ test('cada globo visible tiene una narración autorizada con voz ecuatoriana', (
             for (const bubble of buildNpcSpeechBubbles(activity, lessonIndex)) {
                 const narration = resolveNarration(station.id, bubble.id);
                 assert.ok(narration, `${station.id}:${bubble.id}`);
+                assert.equal(narration.zoneId, 'induction-office');
                 assert.equal(narration.text, bubble.text);
                 assert.equal(narration.kind, bubble.kind);
             }

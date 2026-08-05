@@ -14,6 +14,7 @@ import type {
     CampusProgressState,
     CampusZoneId,
     SpawnManifest,
+    Vector3Tuple,
 } from '../../shared/campus';
 import { OFFICE_MODEL_PATH_LIST } from '../scene/officeAssets';
 import { PerformanceMonitor } from '../scene/performanceMonitor';
@@ -85,6 +86,7 @@ export function CampusWorld({
     movementRef,
     cameraMode,
     paused,
+    conversationFocusTarget,
     nearbyTargetId,
     onNearbyTargetChange,
     onInteract,
@@ -101,6 +103,7 @@ export function CampusWorld({
     movementRef: RefObject<CampusMovementState>;
     cameraMode: CampusCameraMode;
     paused: boolean;
+    conversationFocusTarget: Vector3Tuple | null;
     nearbyTargetId: string | null;
     onNearbyTargetChange: (target: CampusInteractionTarget | null) => void;
     onInteract: (target: CampusInteractionTarget) => void;
@@ -171,6 +174,7 @@ export function CampusWorld({
                         targets={targets}
                         nearbyTargetId={nearbyTargetId}
                         lowQuality={lowQuality}
+                        hideStationTitles={zoneId === 'assessment-room' && paused}
                         onInteract={onInteract}
                     />
                     <CampusPlayer
@@ -179,6 +183,7 @@ export function CampusWorld({
                         movementRef={movementRef}
                         cameraMode={cameraMode}
                         paused={paused}
+                        conversationFocusTarget={conversationFocusTarget}
                         targets={targets}
                         onNearbyTargetChange={onNearbyTargetChange}
                         onStep={onStep}

@@ -15,6 +15,10 @@ import {
     getThirdPersonCameraOffset,
     updateThirdPersonOrbit,
 } from '../src/campus/campusCamera';
+import {
+    getTrainingGuideFocusPosition,
+    getTrainingStationPosition,
+} from '../src/campus/campusTargets';
 
 const EPSILON = 0.000_001;
 
@@ -140,4 +144,15 @@ test('mantiene la cámara delante de un obstáculo incluso a corta distancia', (
     const closeHit = getCollisionSafeCameraDistance(4, 0.1);
     assertApproximatelyEqual(closeHit, 0.05);
     assert.ok(closeHit < 0.1);
+});
+
+test('el enfoque de conversación apunta a la cabeza del NPC y no al centro de la estación', () => {
+    const station = getTrainingStationPosition('obj_manual');
+    const guide = getTrainingGuideFocusPosition('obj_manual');
+
+    assert.ok(station);
+    assert.ok(guide);
+    assert.equal(guide[1], 1.52);
+    assert.notDeepEqual([guide[0], guide[2]], [station[0], station[2]]);
+    assert.equal(getTrainingGuideFocusPosition('missing'), undefined);
 });

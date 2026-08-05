@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-    INDUCTION_ACTIVITIES,
-    isChecklistSelectionCorrect,
-} from '../shared/inductionActivities';
+import { INDUCTION_ACTIVITIES } from '../shared/inductionActivities';
 import {
     buildNpcSpeechBubbles,
     getNpcSpeechRevealInterval,
@@ -71,16 +68,6 @@ test('el directorio presenta los departamentos y una persona de referencia', () 
         && department.role.length > 0
         && department.channel.length > 0
     )));
-});
-
-test('la tarjeta de funciones exige la selección exacta', () => {
-    const checklist = INDUCTION_ACTIVITIES.obj_examen;
-    assert.equal(checklist.kind, 'checklist');
-    if (checklist.kind !== 'checklist') return;
-
-    assert.equal(isChecklistSelectionCorrect(checklist.correctOptionIds, checklist.correctOptionIds), true);
-    assert.equal(isChecklistSelectionCorrect([...checklist.correctOptionIds, 'passwords'], checklist.correctOptionIds), false);
-    assert.equal(isChecklistSelectionCorrect(checklist.correctOptionIds.slice(1), checklist.correctOptionIds), false);
 });
 
 test('las actividades de escenarios tienen una sola respuesta correcta por situación', () => {

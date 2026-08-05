@@ -1,9 +1,12 @@
 import { INDUCTION_ACTIVITIES } from './inductionActivities';
+import { CAMPUS_GUIDE_OBJECT_ID, type CampusZoneId } from './campus';
 import { TRAINING_STATIONS } from './trainingModule';
 
 export const SPEECH_LOCALE = 'es-EC';
 export const MAX_TRANSCRIPTION_BYTES = 1024 * 1024;
 export const MAX_RECORDING_SECONDS = 8;
+export const CAMPUS_GUIDE_BUBBLE_ID = 'campus-guide-welcome';
+export const CAMPUS_GUIDE_DIALOGUE = 'Bienvenido al campus. Comienza en el Centro de inducción, continúa en el Laboratorio de simulación y finaliza en la Sala de evaluación. Acércate a cada acceso para consultar cuándo está disponible.';
 
 export type SpeechCapabilities = {
     narrationAvailable: boolean;
@@ -22,6 +25,7 @@ export type NpcVoiceProfile = {
 };
 
 export type NarrationDescriptor = {
+    zoneId: CampusZoneId;
     stationId: string;
     bubbleId: string;
     kind: 'greeting' | 'explanation' | 'key-point';
@@ -43,20 +47,23 @@ export type VoiceAnswerProposal = {
 };
 
 const VOICE_PROFILES: Record<string, Omit<NpcVoiceProfile, 'stationId' | 'guideName'>> = {
+    [CAMPUS_GUIDE_OBJECT_ID]: { voiceName: 'es-EC-LuisNeural', ratePercent: -3, pitchPercent: 0 },
     obj_manual: { voiceName: 'es-EC-AndreaNeural', ratePercent: 0, pitchPercent: 0 },
     obj_rrhh: { voiceName: 'es-EC-AndreaNeural', ratePercent: -4, pitchPercent: -2 },
     obj_funciones: { voiceName: 'es-EC-LuisNeural', ratePercent: -2, pitchPercent: 0 },
     obj_seguridad: { voiceName: 'es-EC-AndreaNeural', ratePercent: 2, pitchPercent: 2 },
-    obj_examen: { voiceName: 'es-EC-LuisNeural', ratePercent: 1, pitchPercent: -2 },
 };
 
 export function getNpcVoiceProfile(stationId: string): NpcVoiceProfile | null {
     const station = TRAINING_STATIONS.find(({ id }) => id === stationId);
     const profile = VOICE_PROFILES[stationId];
-    if (!station || !profile) return null;
+    const guideName = stationId === CAMPUS_GUIDE_OBJECT_ID
+        ? 'Guía del campus'
+        : station?.guide.name;
+    if (!guideName || !profile) return null;
     return {
         stationId,
-        guideName: station.guide.name,
+        guideName,
         ...profile,
     };
 }
@@ -65,13 +72,28 @@ export function resolveNarration(
     stationId: string,
     bubbleId: string,
 ): NarrationDescriptor | null {
-    const activity = INDUCTION_ACTIVITIES[stationId];
     const voice = getNpcVoiceProfile(stationId);
-    if (!activity || !voice) return null;
+    if (!voice) return null;
+    if (stationId === CAMPUS_GUIDE_OBJECT_ID) {
+        if (bubbleId !== CAMPUS_GUIDE_BUBBLE_ID) return null;
+        return {
+            zoneId: 'lobby',
+            stationId,
+            bubbleId,
+            kind: 'greeting',
+            label: 'Orientación del campus',
+            text: CAMPUS_GUIDE_DIALOGUE,
+            voice,
+        };
+    }
+
+    const activity = INDUCTION_ACTIVITIES[stationId];
+    if (!activity) return null;
 
     for (const [lessonIndex, lesson] of activity.training.lessons.entries()) {
         if (lessonIndex === 0 && bubbleId === `${lesson.id}-greeting`) {
             return {
+                zoneId: 'induction-office',
                 stationId,
                 bubbleId,
                 kind: 'greeting',
@@ -82,6 +104,7 @@ export function resolveNarration(
         }
         if (bubbleId === `${lesson.id}-explanation`) {
             return {
+                zoneId: 'induction-office',
                 stationId,
                 bubbleId,
                 kind: 'explanation',
@@ -92,6 +115,7 @@ export function resolveNarration(
         }
         if (bubbleId === `${lesson.id}-key-point`) {
             return {
+                zoneId: 'induction-office',
                 stationId,
                 bubbleId,
                 kind: 'key-point',
