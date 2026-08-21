@@ -45,13 +45,21 @@ La tercera persona es el modo inicial. La primera persona solicita pointer lock 
 
 ## Requisitos
 
-- Node.js 22.12 o superior.
+- Node.js 22.13 o superior.
 - npm 10.9 o superior.
 - MongoDB local o MongoDB Atlas.
 - Navegador de escritorio moderno con WebGL.
 - Resolución recomendada: 1280×720 o superior.
 
 ## Instalación
+
+En Windows, asegúrate de que MongoDB esté en ejecución y abre
+`INICIAR.cmd`. El iniciador crea `.env` si falta, instala las dependencias,
+carga los datos iniciales y abre el frontend y el backend en ventanas
+separadas. En los siguientes inicios solo reinstala las dependencias cuando
+cambia `package-lock.json`.
+
+Para una instalación manual:
 
 ```bash
 npm ci

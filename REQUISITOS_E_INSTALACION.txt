@@ -1,0 +1,116 @@
+METATRAIN VR - REQUISITOS E INSTALACION EN WINDOWS
+==================================================
+
+Este proyecto necesita:
+
+- Windows 10 u 11 de 64 bits.
+- Node.js 22.13 o superior.
+- npm 10.9 o superior (npm se instala junto con Node.js).
+- MongoDB Community Server.
+- Un navegador moderno compatible con WebGL.
+
+React, TypeScript, Vite, Express, Three.js, Mongoose y los demas paquetes
+del proyecto NO se instalan globalmente. El iniciador los descarga usando
+las versiones registradas en package-lock.json.
+
+
+1. INSTALAR NODE.JS Y MONGODB
+-----------------------------
+
+Abre PowerShell como administrador y ejecuta:
+
+winget source update
+winget install --exact --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+winget install --exact --id MongoDB.Server --accept-package-agreements --accept-source-agreements
+
+Cuando finalicen las instalaciones, cierra PowerShell y abre una ventana
+nueva para que Windows actualice el PATH.
+
+Si winget no esta disponible, instala manualmente desde:
+
+Node.js: https://nodejs.org/en/download
+MongoDB: https://www.mongodb.com/try/download/community
+
+Durante la instalacion de MongoDB, deja seleccionada la opcion para
+instalar MongoDB como un servicio de Windows.
+
+
+2. COMPROBAR LAS INSTALACIONES
+------------------------------
+
+Abre una nueva ventana de PowerShell y ejecuta:
+
+node --version
+npm --version
+Get-Service MongoDB
+
+Node debe mostrar la version 22.13.0 o una superior. El servicio MongoDB
+debe aparecer con estado Running. Si esta detenido, abre PowerShell como
+administrador y ejecuta:
+
+Start-Service MongoDB
+
+
+3. EJECUTAR METATRAIN VR
+------------------------
+
+Extrae primero todo el proyecto. No ejecutes el iniciador directamente
+desde dentro del archivo ZIP.
+
+Luego haz doble clic en:
+
+INICIAR.cmd
+
+El iniciador realizara automaticamente estas tareas:
+
+- Creara .env a partir de .env.example cuando sea necesario.
+- Ejecutara npm ci para descargar las dependencias del proyecto.
+- Cargara los datos iniciales en MongoDB.
+- Abrira el backend y el frontend en dos ventanas de PowerShell.
+- Abrira http://localhost:5173 en el navegador.
+
+La primera ejecucion puede tardar varios minutos debido a la descarga de
+dependencias. Las siguientes ejecuciones reutilizaran la instalacion salvo
+que package-lock.json haya cambiado.
+
+
+4. EJECUCION MANUAL (OPCIONAL)
+------------------------------
+
+Abre PowerShell dentro de la carpeta del proyecto y ejecuta:
+
+npm ci
+Copy-Item .env.example .env
+npm run seed
+
+Despues abre dos terminales en la carpeta del proyecto.
+
+Terminal 1:
+
+npm run dev:backend
+
+Terminal 2:
+
+npm run dev:frontend
+
+Abre http://localhost:5173 en el navegador.
+
+
+5. DETENER EL PROYECTO
+----------------------
+
+Cierra las dos ventanas de PowerShell abiertas por INICIAR.cmd. MongoDB
+puede permanecer ejecutandose como servicio de Windows.
+
+
+SOLUCION DE PROBLEMAS
+---------------------
+
+- Si node o npm no se reconocen, cierra y abre PowerShell nuevamente.
+- Si no se puede conectar con MongoDB, comprueba Get-Service MongoDB.
+- Si npm informa que un archivo esta en uso, cierra todas las ventanas
+  anteriores de MetaTrain VR y vuelve a ejecutar INICIAR.cmd.
+- Si el puerto 3000 o 5173 esta ocupado, cierra la aplicacion que lo usa.
+- Azure Speech es opcional. El proyecto puede ejecutarse localmente con
+  AZURE_SPEECH_ENABLED=false.
+
