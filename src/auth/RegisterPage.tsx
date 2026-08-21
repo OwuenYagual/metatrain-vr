@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getErrorMessage } from '../api/apiClient';
+import { AuthLayout } from './AuthLayout';
 import { authService } from './authService';
 
 export default function RegisterPage() {
@@ -35,14 +36,17 @@ export default function RegisterPage() {
     };
 
     return (
-        <main style={{ padding: '2rem', maxWidth: '400px', margin: '0 auto' }}>
-            <h1 style={{ fontSize: '1.75rem' }}>Crear cuenta - MetaTrain VR</h1>
-            {error && <p role="alert" style={{ color: '#b91c1c' }}>{error}</p>}
-            {success && <p role="status" style={{ color: '#166534' }}>{success}</p>}
+        <AuthLayout
+            eyebrow="Nuevo participante"
+            title="Crear cuenta"
+            description="Registra tus datos para guardar avances, evaluaciones y certificados."
+        >
+            {error && <p role="alert" className="auth-message auth-message-error">{error}</p>}
+            {success && <p role="status" className="auth-message auth-message-success">{success}</p>}
 
-            <form onSubmit={handleSubmit}>
-                <div style={{ marginBottom: '1rem' }}>
-                    <label htmlFor="register-name">Nombre completo:</label>
+            <form className="auth-form" onSubmit={handleSubmit}>
+                <div className="auth-field">
+                    <label htmlFor="register-name">Nombre completo</label>
                     <input
                         id="register-name"
                         autoComplete="name"
@@ -50,11 +54,10 @@ export default function RegisterPage() {
                         value={fullName}
                         onChange={(event) => setFullName(event.target.value)}
                         required
-                        style={{ width: '100%', padding: '0.5rem' }}
                     />
                 </div>
-                <div style={{ marginBottom: '1rem' }}>
-                    <label htmlFor="register-email">Correo electrónico:</label>
+                <div className="auth-field">
+                    <label htmlFor="register-email">Correo electrónico</label>
                     <input
                         id="register-email"
                         autoComplete="email"
@@ -62,11 +65,10 @@ export default function RegisterPage() {
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         required
-                        style={{ width: '100%', padding: '0.5rem' }}
                     />
                 </div>
-                <div style={{ marginBottom: '1rem' }}>
-                    <label htmlFor="register-password">Contraseña:</label>
+                <div className="auth-field">
+                    <label htmlFor="register-password">Contraseña</label>
                     <input
                         id="register-password"
                         autoComplete="new-password"
@@ -75,16 +77,16 @@ export default function RegisterPage() {
                         onChange={(event) => setPassword(event.target.value)}
                         minLength={8}
                         required
-                        style={{ width: '100%', padding: '0.5rem' }}
                     />
+                    <span className="auth-field-help">Usa mínimo 8 caracteres.</span>
                 </div>
-                <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.75rem', cursor: 'pointer' }}>
+                <button className="auth-submit" type="submit" disabled={loading}>
                     {loading ? 'Creando cuenta...' : 'Registrarse'}
                 </button>
             </form>
-            <p style={{ marginTop: '1rem' }}>
+            <p className="auth-switch">
                 ¿Ya tienes cuenta? <Link to="/login">Inicia sesión aquí</Link>
             </p>
-        </main>
+        </AuthLayout>
     );
 }

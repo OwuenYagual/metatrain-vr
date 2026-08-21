@@ -190,6 +190,12 @@
   bottom: 1rem;
 }
 
+.global-user-menu.is-embedded {
+  position: relative;
+  z-index: auto;
+  inset: auto;
+}
+
 .global-user-menu > button {
   display: grid;
   width: 1.9rem;
@@ -257,6 +263,10 @@ body:has(.induction-panel) .global-user-menu {
   display: none;
 }
 
+body:has(.campus-simulation-panel) .global-user-menu:not(.is-embedded) {
+  right: calc(min(440px, calc(100vw - 2rem)) + 1.6rem);
+}
+
 @media (max-width: 760px) {
   .global-user-menu {
     right: 0.55rem;
@@ -266,6 +276,11 @@ body:has(.induction-panel) .global-user-menu {
   .global-user-menu > button {
     width: 1.85rem;
     height: 1.85rem;
+  }
+
+  body:has(.campus-simulation-panel) .global-user-menu:not(.is-embedded) {
+    right: 0.55rem;
+    bottom: calc(56svh + 0.55rem);
   }
 
 }

@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
+import {
+    SIMULATION_STAGE_CATALOG,
+    SIMULATION_VERSION,
+} from '../../shared/simulation';
 
 const participantId = 'participant-e2e';
 const moduleId = 'induccion_001';
@@ -195,6 +199,23 @@ async function mockApi(page: Page, options: MockOptions = {}) {
 
         if (pathname.endsWith(`/api/training/${moduleId}/contents`) && request.method() === 'GET') {
             await fulfillJson(route, contents);
+            return;
+        }
+
+        if (pathname.endsWith(`/api/simulation/${moduleId}`) && request.method() === 'GET') {
+            await fulfillJson(route, {
+                scenario: {
+                    id: 'first-day-immersive',
+                    simulationVersion: SIMULATION_VERSION,
+                    title: 'Reto del primer día',
+                    introduction: 'Recorre las estaciones y resuelve cada situación.',
+                    stages: SIMULATION_STAGE_CATALOG,
+                },
+                simulation: null,
+                legacyCompleted: false,
+                completed: false,
+                canReplay: false,
+            });
             return;
         }
 
@@ -441,6 +462,119 @@ test('entra al laboratorio desde la puerta central del vestíbulo', async ({ pag
     await expect(page.locator('[aria-label="Campus 3D: simulation-lab"] canvas')).toBeVisible();
     await page.waitForTimeout(1_200);
     await expect(page).toHaveURL(/\/campus\/simulation-lab$/);
+
+    const laboratoryCanvas = page.locator('[aria-label="Campus 3D: simulation-lab"] canvas');
+    const challengePrompt = page.getByRole('button', {
+        name: /Interactuar con Reto del primer día/i,
+    });
+    await laboratoryCanvas.focus();
+    await page.keyboard.down('w');
+    try {
+        await expect(challengePrompt).toBeVisible({ timeout: 8_000 });
+    } finally {
+        await page.keyboard.up('w');
+    }
+    await challengePrompt.click();
+
+    const headerPanel = page.locator('.campus-simulation-panel-header');
+    const progressPanel = page.locator('.simulation-progress-panel');
+    const activityPanel = page.locator('.simulation-activity-panel');
+    const quickControls = page.getByRole('navigation', { name: 'Acciones rápidas del campus' });
+    await expect(headerPanel).toBeVisible();
+    await expect(progressPanel).toBeVisible();
+    await expect(activityPanel).toBeVisible();
+    await expect(quickControls).toBeVisible();
+    await expect(quickControls.getByRole('button')).toHaveCount(4);
+    const userMenuButton = quickControls.getByRole('button', { name: 'Abrir menú de usuario' });
+    await userMenuButton.click();
+    await expect(quickControls.getByRole('menuitem', { name: 'Cerrar sesión' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(userMenuButton).toBeFocused();
+    const layout = await page.evaluate(() => {
+        const header = document.querySelector<HTMLElement>('.campus-simulation-panel-header');
+        const progress = document.querySelector<HTMLElement>('.simulation-progress-panel');
+        const activity = document.querySelector<HTMLElement>('.simulation-activity-panel');
+        const controls = document.querySelector<HTMLElement>('.campus-quick-controls');
+        if (!header || !progress || !activity || !controls) {
+            throw new Error('No se renderizaron los paneles.');
+        }
+        return {
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+            header: header.getBoundingClientRect().toJSON(),
+            progress: progress.getBoundingClientRect().toJSON(),
+            activity: activity.getBoundingClientRect().toJSON(),
+            controls: controls.getBoundingClientRect().toJSON(),
+        };
+    });
+    expect(layout.header.x).toBeLessThan(layout.viewport.width / 2);
+    expect(layout.header.y).toBeLessThan(layout.viewport.height / 2);
+    expect(layout.progress.x).toBeLessThan(layout.viewport.width / 2);
+    expect(layout.progress.y).toBeGreaterThan(layout.viewport.height / 2);
+    expect(layout.progress.width).toBeLessThan(layout.header.width);
+    expect(layout.activity.x).toBeGreaterThan(layout.viewport.width / 2);
+    expect(layout.progress.right).toBeLessThan(layout.controls.left);
+    expect(layout.controls.right).toBeLessThan(layout.activity.left);
+
+    await page.setViewportSize({ width: 375, height: 667 });
+    const mobileLayout = await page.evaluate(() => {
+        const header = document.querySelector<HTMLElement>('.campus-simulation-panel-header');
+        const progress = document.querySelector<HTMLElement>('.simulation-progress-panel');
+        const activity = document.querySelector<HTMLElement>('.simulation-activity-panel');
+        const controls = document.querySelector<HTMLElement>('.campus-quick-controls');
+        if (!header || !progress || !activity || !controls) {
+            throw new Error('No se renderizaron los paneles.');
+        }
+        return {
+            header: header.getBoundingClientRect().toJSON(),
+            progress: progress.getBoundingClientRect().toJSON(),
+            activity: activity.getBoundingClientRect().toJSON(),
+            controls: controls.getBoundingClientRect().toJSON(),
+        };
+    });
+    expect(mobileLayout.header.bottom).toBeLessThanOrEqual(mobileLayout.activity.top);
+    expect(mobileLayout.activity.bottom).toBeLessThanOrEqual(mobileLayout.progress.top);
+    expect(mobileLayout.header.right).toBeLessThanOrEqual(375);
+    expect(mobileLayout.progress.bottom).toBeLessThanOrEqual(667);
+    expect(mobileLayout.progress.right).toBeLessThan(mobileLayout.controls.left);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    await page.evaluate(async () => {
+        const modulePath = '/src/simulation/useSimulationStore.ts';
+        const { useSimulationStore } = await import(modulePath);
+        const state = useSimulationStore.getState();
+        if (!state.scenario || !state.payload) throw new Error('No se cargó la simulación.');
+        const completedAt = new Date().toISOString();
+        const simulation = {
+            runId: 'run-e2e-completed',
+            simulationVersion: state.scenario.simulationVersion,
+            scenarioId: state.scenario.id,
+            status: 'completed' as const,
+            currentStageId: null,
+            startedAt: completedAt,
+            completedAt,
+            completedStageCount: state.scenario.stages.length,
+            requiredStageCount: state.scenario.stages.length,
+            stages: state.scenario.stages.map((stage: { id: string }) => ({
+                stageId: stage.id,
+                status: 'completed' as const,
+                inspections: [],
+                attempts: [],
+                completedAt,
+            })),
+        };
+        useSimulationStore.setState({
+            simulation,
+            currentStage: null,
+            feedback: null,
+            payload: { ...state.payload, simulation, completed: true, canReplay: true },
+        });
+    });
+    await expect(page.getByRole('heading', { name: 'Completaste tu primer día' })).toBeVisible();
+    const completionPosition = await activityPanel.evaluate((panel) => {
+        const rect = panel.getBoundingClientRect();
+        return { centerX: rect.left + rect.width / 2, viewportCenterX: window.innerWidth / 2 };
+    });
+    expect(Math.abs(completionPosition.centerX - completionPosition.viewportCenterX)).toBeLessThan(2);
 });
 
 test('mantiene desarmado el portal inverso al aparecer en el laboratorio', async ({ page }) => {
@@ -779,8 +913,11 @@ test('permite reprobar, reintentar, aprobar y emitir el certificado PDF', async 
     const radios = dialog.getByRole('radio');
     await expect(radios).toHaveCount(4);
     await radios.nth(0).check();
+    await expect(dialog.locator('fieldset').nth(1)).toBeFocused();
     await radios.nth(2).check();
-    await dialog.getByRole('button', { name: /Finalizar evaluaci/i }).click();
+    const finishEvaluationButton = dialog.getByRole('button', { name: /Finalizar evaluaci/i });
+    await expect(finishEvaluationButton).toBeFocused();
+    await finishEvaluationButton.click();
 
     await expect(dialog.getByRole('heading', { name: /intentarlo nuevamente/i })).toBeVisible();
     await expect(dialog.getByText('50%')).toBeVisible();

@@ -17,7 +17,11 @@ import {
     validateInteractionInput,
     validateLocationInput,
 } from '../server/domain/progress';
-import { SIMULATION_DECISION_IDS, TRAINING_SIMULATION } from '../server/domain/simulation';
+import {
+    createSimulationRun,
+    SIMULATION_DECISION_IDS,
+    TRAINING_SIMULATION,
+} from '../server/domain/simulation';
 import TrainingProgress, { type ITrainingProgress } from '../server/models/progress.model';
 
 const requiredContents = ['c1', 'c2', 'c3', 'c4'];
@@ -68,6 +72,30 @@ test('calcula desbloqueos únicamente con contenidos y decisiones canónicas', (
         complete,
         requiredContents,
     )), true);
+});
+
+test('desbloquea la evaluación con una jornada inmersiva V2 completada', () => {
+    const run = createSimulationRun(
+        'run-campus-completed',
+        'evt-campus-start',
+        new Date('2026-08-05T13:00:00.000Z'),
+    );
+    run.status = 'completed';
+    run.currentStageId = undefined;
+    run.completedAt = new Date('2026-08-05T14:00:00.000Z');
+    run.stages.forEach((stage) => {
+        stage.status = 'completed';
+        stage.completedAt = run.completedAt;
+    });
+    const complete = progress({
+        completedContents: requiredContents,
+        simulationRuns: [run],
+    });
+    assert.deepEqual(getCampusProgressState(complete, requiredContents), {
+        trainingCompleted: true,
+        simulationCompleted: true,
+        approved: false,
+    });
 });
 
 test('rechaza objetos usados desde otra zona o antes de desbloquearlos', () => {

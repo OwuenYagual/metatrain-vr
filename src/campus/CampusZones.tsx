@@ -27,6 +27,13 @@ import {
     getTrainingStationPosition,
     type CampusInteractionTarget,
 } from './campusTargets';
+import {
+    SimulationLabEnvironment,
+} from './SimulationLabEnvironment';
+import type {
+    SimulationLabSceneState,
+    SimulationLabStageId,
+} from './simulationLabScene';
 
 const NPC_DIALOGUE_PROJECTED_POSITION = new Vector3();
 const NPC_DIALOGUE_MARGIN_PX = 12;
@@ -264,10 +271,12 @@ function CampusNpcDialogueBubble({
 function PortalVisual({
     target,
     nearby,
+    hideLabel,
     onInteract,
 }: {
     target: CampusInteractionTarget;
     nearby: boolean;
+    hideLabel: boolean;
     onInteract: (target: CampusInteractionTarget) => void;
 }) {
     const [hovered, setHovered] = useState(false);
@@ -329,11 +338,13 @@ function PortalVisual({
                     </mesh>
                 </group>
             )}
-            <Html position={[0, 2.85, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
-                <span className={`campus-world-label ${target.unlocked ? '' : 'is-locked'}`}>
-                    {target.label}
-                </span>
-            </Html>
+            {!hideLabel && (
+                <Html position={[0, 2.85, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+                    <span className={`campus-world-label ${target.unlocked ? '' : 'is-locked'}`}>
+                        {target.label}
+                    </span>
+                </Html>
+            )}
         </group>
     );
 }
@@ -583,37 +594,27 @@ function InductionEnvironment({ completedStationIds }: { completedStationIds: re
     );
 }
 
-function SimulationEnvironment({ lowQuality }: { lowQuality: boolean }) {
-    const pods = [-3, -1.5, 1.5, 3];
+function SimulationEnvironment({
+    lowQuality,
+    sceneState,
+    hideLabels,
+    onStageInteract,
+}: {
+    lowQuality: boolean;
+    sceneState?: SimulationLabSceneState;
+    hideLabels: boolean;
+    onStageInteract?: (stageId: SimulationLabStageId) => void;
+}) {
     return (
         <>
             <RoomShell floor="#111b2d" wall="#18263b" />
             <InstancedColumns color="#155e75" />
-            {pods.map((x) => (
-                <group key={x} position={[x, 0, 1.25]}>
-                    <mesh position={[0, 0.42, 0]} castShadow>
-                        <cylinderGeometry args={[0.54, 0.72, 0.84, 8]} />
-                        <meshStandardMaterial color="#1e3a5f" metalness={0.28} roughness={0.52} />
-                    </mesh>
-                    {!lowQuality && (
-                        <mesh position={[0, 1.15, 0]}>
-                            <cylinderGeometry args={[0.32, 0.52, 1.35, 12, 1, true]} />
-                            <meshStandardMaterial color="#22d3ee" emissive="#0891b2" emissiveIntensity={0.75} transparent opacity={0.15} />
-                        </mesh>
-                    )}
-                </group>
-            ))}
-            <RigidBody type="fixed" colliders={false}>
-                <CuboidCollider args={[1.3, 0.62, 0.7]} position={[0, 0.62, -1.25]} />
-            </RigidBody>
-            <mesh position={[0, 0.6, -1.25]} castShadow userData={{ cameraBlocker: true }}>
-                <cylinderGeometry args={[1.1, 1.4, 1.2, 8]} />
-                <meshStandardMaterial color="#0e7490" metalness={0.35} roughness={0.42} />
-            </mesh>
-            <mesh position={[0, 1.5, -1.25]} rotation={[-0.22, 0, 0]}>
-                <boxGeometry args={[1.5, 0.88, 0.08]} />
-                <meshStandardMaterial color="#67e8f9" emissive="#06b6d4" emissiveIntensity={0.65} />
-            </mesh>
+            <SimulationLabEnvironment
+                lowQuality={lowQuality}
+                sceneState={sceneState}
+                hideLabels={hideLabels}
+                onStageInteract={onStageInteract}
+            />
         </>
     );
 }
@@ -738,7 +739,9 @@ export function CampusZoneEnvironment({
     nearbyTargetId,
     lowQuality,
     hideStationTitles,
+    simulationSceneState,
     onInteract,
+    onSimulationStageInteract,
 }: {
     zoneId: CampusZoneId;
     progress: CampusProgressState;
@@ -747,7 +750,9 @@ export function CampusZoneEnvironment({
     nearbyTargetId: string | null;
     lowQuality: boolean;
     hideStationTitles: boolean;
+    simulationSceneState?: SimulationLabSceneState;
     onInteract: (target: CampusInteractionTarget) => void;
+    onSimulationStageInteract?: (stageId: SimulationLabStageId) => void;
 }) {
     const campusGuideTarget = targets.find(({ kind }) => kind === 'campus_guide');
 
@@ -763,7 +768,14 @@ export function CampusZoneEnvironment({
             {zoneId === 'induction-office' && (
                 <InductionEnvironment completedStationIds={completedStationIds} />
             )}
-            {zoneId === 'simulation-lab' && <SimulationEnvironment lowQuality={lowQuality} />}
+            {zoneId === 'simulation-lab' && (
+                <SimulationEnvironment
+                    lowQuality={lowQuality}
+                    sceneState={simulationSceneState}
+                    hideLabels={hideStationTitles}
+                    onStageInteract={onSimulationStageInteract}
+                />
+            )}
             {zoneId === 'assessment-room' && <AssessmentEnvironment approved={progress.approved} />}
             {targets.filter(({ kind }) => kind !== 'campus_guide').map((target) => target.kind === 'portal'
                 ? (
@@ -771,6 +783,7 @@ export function CampusZoneEnvironment({
                         key={target.id}
                         target={target}
                         nearby={nearbyTargetId === target.id}
+                        hideLabel={hideStationTitles}
                         onInteract={onInteract}
                     />
                 )
@@ -779,7 +792,8 @@ export function CampusZoneEnvironment({
                         key={target.id}
                         target={target}
                         nearby={nearbyTargetId === target.id}
-                        hideStationTitle={hideStationTitles}
+                        hideStationTitle={hideStationTitles
+                            || (target.kind === 'simulation_terminal' && Boolean(simulationSceneState?.activeRun))}
                         onInteract={onInteract}
                     />
                 ))}

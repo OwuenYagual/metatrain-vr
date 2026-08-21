@@ -11,6 +11,10 @@ import type { EvaluationQuestion } from '../evaluation/evaluationService';
 import { speechService } from './speechService';
 
 type VoiceAnswerStatus = 'idle' | 'requesting' | 'listening' | 'processing' | 'proposal' | 'error';
+type VoiceCaptureMode = 'hold' | 'automatic';
+
+const SILENCE_AFTER_SPEECH_MS = 900;
+const VOICE_ACTIVITY_THRESHOLD = 0.035;
 
 function preferredMimeType(): string | null {
     if (typeof MediaRecorder === 'undefined') return null;
@@ -18,17 +22,23 @@ function preferredMimeType(): string | null {
         .find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? null;
 }
 
-export function useVoiceAnswer(onMicrophoneActiveChange: (active: boolean) => void) {
+export function useVoiceAnswer(
+    onMicrophoneActiveChange: (active: boolean) => void,
+    onMatchedAnswer?: (questionId: string, optionId: string, transcript: string) => void,
+) {
     const [capabilities, setCapabilities] = useState<SpeechCapabilities | null>(null);
     const [status, setStatus] = useState<VoiceAnswerStatus>('idle');
     const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
     const [proposal, setProposal] = useState<VoiceAnswerProposal | null>(null);
     const [error, setError] = useState('');
+    const statusRef = useRef<VoiceAnswerStatus>('idle');
     const recorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const holdActiveRef = useRef(false);
     const timeoutRef = useRef<number | null>(null);
+    const silenceFrameRef = useRef<number | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
     const requestGenerationRef = useRef(0);
 
     useEffect(() => {
@@ -45,9 +55,17 @@ export function useVoiceAnswer(onMicrophoneActiveChange: (active: boolean) => vo
         return () => controller.abort();
     }, []);
 
+    useEffect(() => {
+        statusRef.current = status;
+    }, [status]);
+
     const releaseResources = useCallback(() => {
         if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
+        if (silenceFrameRef.current !== null) window.cancelAnimationFrame(silenceFrameRef.current);
+        silenceFrameRef.current = null;
+        if (audioContextRef.current) void audioContextRef.current.close();
+        audioContextRef.current = null;
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
         recorderRef.current = null;
@@ -72,8 +90,13 @@ export function useVoiceAnswer(onMicrophoneActiveChange: (active: boolean) => vo
 
     useEffect(() => cancel, [cancel]);
 
-    const begin = useCallback(async (question: EvaluationQuestion) => {
-        if (status === 'requesting' || status === 'listening' || status === 'processing') return;
+    const begin = useCallback(async (
+        question: EvaluationQuestion,
+        mode: VoiceCaptureMode = 'hold',
+    ) => {
+        if (statusRef.current === 'requesting'
+            || statusRef.current === 'listening'
+            || statusRef.current === 'processing') return;
         const mimeType = preferredMimeType();
         if (!capabilities?.transcriptionAvailable || !mimeType || !navigator.mediaDevices?.getUserMedia) {
             setActiveQuestionId(question.id);
@@ -110,7 +133,7 @@ export function useVoiceAnswer(onMicrophoneActiveChange: (active: boolean) => vo
                 releaseResources();
                 const audio = new Blob(chunks, { type: mimeType.split(';')[0] });
                 if (audio.size === 0) {
-                    setError('No se detectó audio. Mantén pulsado el botón mientras respondes.');
+                    setError('No se detectó audio. Intenta responder de nuevo.');
                     setStatus('error');
                     return;
                 }
@@ -128,6 +151,15 @@ export function useVoiceAnswer(onMicrophoneActiveChange: (active: boolean) => vo
                             result.transcript,
                             question.options,
                         );
+                        if (nextProposal.status === 'matched' && nextProposal.optionId) {
+                            onMatchedAnswer?.(
+                                nextProposal.questionId,
+                                nextProposal.optionId,
+                                nextProposal.transcript,
+                            );
+                            cancel();
+                            return;
+                        }
                         setProposal(nextProposal);
                         setStatus('proposal');
                     })
@@ -140,6 +172,37 @@ export function useVoiceAnswer(onMicrophoneActiveChange: (active: boolean) => vo
             recorder.start(200);
             onMicrophoneActiveChange(true);
             setStatus('listening');
+            if (mode === 'automatic') {
+                const audioContext = new AudioContext();
+                const analyser = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(stream);
+                let heardSpeech = false;
+                let lastVoiceAt = performance.now();
+                analyser.fftSize = 1024;
+                const samples = new Float32Array(analyser.fftSize);
+                source.connect(analyser);
+                audioContextRef.current = audioContext;
+                void audioContext.resume();
+
+                const detectSilence = () => {
+                    if (recorder.state !== 'recording') return;
+                    analyser.getFloatTimeDomainData(samples);
+                    const rootMeanSquare = Math.sqrt(
+                        samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length,
+                    );
+                    const now = performance.now();
+                    if (rootMeanSquare >= VOICE_ACTIVITY_THRESHOLD) {
+                        heardSpeech = true;
+                        lastVoiceAt = now;
+                    } else if (heardSpeech && now - lastVoiceAt >= SILENCE_AFTER_SPEECH_MS) {
+                        holdActiveRef.current = false;
+                        recorder.stop();
+                        return;
+                    }
+                    silenceFrameRef.current = window.requestAnimationFrame(detectSilence);
+                };
+                silenceFrameRef.current = window.requestAnimationFrame(detectSilence);
+            }
             timeoutRef.current = window.setTimeout(() => {
                 holdActiveRef.current = false;
                 if (recorder.state === 'recording') recorder.stop();
@@ -151,7 +214,7 @@ export function useVoiceAnswer(onMicrophoneActiveChange: (active: boolean) => vo
                 : getErrorMessage(requestError, 'No se pudo abrir el micrófono.'));
             setStatus('error');
         }
-    }, [cancel, capabilities, onMicrophoneActiveChange, releaseResources, status]);
+    }, [cancel, capabilities, onMatchedAnswer, onMicrophoneActiveChange, releaseResources]);
 
     const end = useCallback(() => {
         holdActiveRef.current = false;

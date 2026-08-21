@@ -1,11 +1,35 @@
 import { INDUCTION_ACTIVITIES } from './inductionActivities';
 import { CAMPUS_GUIDE_OBJECT_ID, type CampusZoneId } from './campus';
+import {
+    SIMULATION_STAGE_CATALOG,
+    SIMULATION_STAGE_IDS,
+    type SimulationStageId,
+} from './simulation';
 import { TRAINING_STATIONS } from './trainingModule';
 
 export const SPEECH_LOCALE = 'es-EC';
 export const MAX_TRANSCRIPTION_BYTES = 1024 * 1024;
 export const MAX_RECORDING_SECONDS = 8;
 export const CAMPUS_GUIDE_BUBBLE_ID = 'campus-guide-welcome';
+export const EVALUATION_NPC_STATION_ID = 'npc-evaluation';
+export const EVALUATION_RESPONSE_INSTRUCTION = 'Responde solo con la letra de la opción.';
+export const EVALUATION_RESPONSE_PROMPT = '¿Cuál es tu respuesta?';
+const SIMULATION_GUIDE_STATION_PREFIX = 'sim-guide-';
+const SIMULATION_GUIDE_BUBBLE_SUFFIX = '-briefing';
+
+export function getSimulationGuideStationId(stageId: SimulationStageId): string {
+    return `${SIMULATION_GUIDE_STATION_PREFIX}${stageId}`;
+}
+
+export function getSimulationGuideBubbleId(stageId: SimulationStageId): string {
+    return `${stageId}${SIMULATION_GUIDE_BUBBLE_SUFFIX}`;
+}
+
+export function getSimulationGuideStageId(stationId: string): SimulationStageId | null {
+    if (!stationId.startsWith(SIMULATION_GUIDE_STATION_PREFIX)) return null;
+    const stageId = stationId.slice(SIMULATION_GUIDE_STATION_PREFIX.length);
+    return SIMULATION_STAGE_IDS.find((candidate) => candidate === stageId) ?? null;
+}
 export const CAMPUS_GUIDE_DIALOGUE = 'Bienvenido al campus. Comienza en el Centro de inducción, continúa en el Laboratorio de simulación y finaliza en la Sala de evaluación. Acércate a cada acceso para consultar cuándo está disponible.';
 
 export type SpeechCapabilities = {
@@ -52,20 +76,46 @@ const VOICE_PROFILES: Record<string, Omit<NpcVoiceProfile, 'stationId' | 'guideN
     obj_rrhh: { voiceName: 'es-EC-AndreaNeural', ratePercent: -4, pitchPercent: -2 },
     obj_funciones: { voiceName: 'es-EC-LuisNeural', ratePercent: -2, pitchPercent: 0 },
     obj_seguridad: { voiceName: 'es-EC-AndreaNeural', ratePercent: 2, pitchPercent: 2 },
+    [getSimulationGuideStationId('data_protection')]: { voiceName: 'es-EC-AndreaNeural', ratePercent: -2, pitchPercent: 0 },
+    [getSimulationGuideStationId('human_resources')]: { voiceName: 'es-EC-AndreaNeural', ratePercent: -3, pitchPercent: -1 },
+    [getSimulationGuideStationId('operations')]: { voiceName: 'es-EC-LuisNeural', ratePercent: -2, pitchPercent: 0 },
+    [getSimulationGuideStationId('workplace_safety')]: { voiceName: 'es-EC-AndreaNeural', ratePercent: 0, pitchPercent: 1 },
+    [EVALUATION_NPC_STATION_ID]: { voiceName: 'es-EC-AndreaNeural', ratePercent: -3, pitchPercent: 0 },
 };
 
 export function getNpcVoiceProfile(stationId: string): NpcVoiceProfile | null {
     const station = TRAINING_STATIONS.find(({ id }) => id === stationId);
+    const simulationStageId = getSimulationGuideStageId(stationId);
+    const simulationStage = SIMULATION_STAGE_CATALOG.find(({ id }) => id === simulationStageId);
     const profile = VOICE_PROFILES[stationId];
     const guideName = stationId === CAMPUS_GUIDE_OBJECT_ID
         ? 'Guía del campus'
-        : station?.guide.name;
+        : stationId === EVALUATION_NPC_STATION_ID
+            ? 'Guía de evaluación'
+            : station?.guide.name ?? simulationStage?.guide.name;
     if (!guideName || !profile) return null;
     return {
         stationId,
         guideName,
         ...profile,
     };
+}
+
+const EVALUATION_OPTION_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+export function buildEvaluationNarrationText(question: {
+    text: string;
+    options: readonly { text: string }[];
+}): string {
+    const options = question.options.map((option, index) => (
+        `Opción ${EVALUATION_OPTION_LABELS[index] ?? index + 1}: ${option.text}.`
+    ));
+    return [
+        question.text,
+        ...options,
+        EVALUATION_RESPONSE_INSTRUCTION,
+        EVALUATION_RESPONSE_PROMPT,
+    ].join(' ');
 }
 
 export function resolveNarration(
@@ -83,6 +133,21 @@ export function resolveNarration(
             kind: 'greeting',
             label: 'Orientación del campus',
             text: CAMPUS_GUIDE_DIALOGUE,
+            voice,
+        };
+    }
+
+    const simulationStageId = getSimulationGuideStageId(stationId);
+    const simulationStage = SIMULATION_STAGE_CATALOG.find(({ id }) => id === simulationStageId);
+    if (simulationStageId && simulationStage) {
+        if (bubbleId !== getSimulationGuideBubbleId(simulationStageId)) return null;
+        return {
+            zoneId: 'simulation-lab',
+            stationId,
+            bubbleId,
+            kind: 'explanation',
+            label: simulationStage.title,
+            text: simulationStage.guide.introduction,
             voice,
         };
     }
@@ -139,16 +204,18 @@ export function normalizeSpokenText(value: string): string {
 }
 
 const SPOKEN_INDEXES = [
-    ['uno', 'un', 'primera', 'primero', 'a'],
-    ['dos', 'segunda', 'segundo', 'b'],
-    ['tres', 'tercera', 'tercero', 'c'],
-    ['cuatro', 'cuarta', 'cuarto', 'd'],
-    ['cinco', 'quinta', 'quinto', 'e'],
+    ['uno', 'un', 'primera', 'primero', 'a', 'ah'],
+    ['dos', 'segunda', 'segundo', 'b', 'be', 've'],
+    ['tres', 'tercera', 'tercero', 'c', 'ce'],
+    ['cuatro', 'cuarta', 'cuarto', 'd', 'de'],
+    ['cinco', 'quinta', 'quinto', 'e', 'eh'],
 ] as const;
 
 function spokenOptionIndex(normalized: string): number | null {
     const match = normalized.match(/(?:opcion|respuesta|alternativa|numero)\s+([a-z0-9]+)/);
-    const token = match?.[1] ?? (/^[1-5]$/.test(normalized) ? normalized : null);
+    const standaloneLetter = SPOKEN_INDEXES.some((tokens) => tokens.includes(normalized as never));
+    const token = match?.[1]
+        ?? (/^[1-5]$/.test(normalized) || standaloneLetter ? normalized : null);
     if (!token) return null;
     if (/^[1-5]$/.test(token)) return Number(token) - 1;
     const index = SPOKEN_INDEXES.findIndex((tokens) => tokens.includes(token as never));

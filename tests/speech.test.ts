@@ -2,9 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { INDUCTION_ACTIVITIES } from '../shared/inductionActivities';
 import { CAMPUS_GUIDE_OBJECT_ID } from '../shared/campus';
+import { SIMULATION_STAGE_CATALOG } from '../shared/simulation';
 import {
+    buildEvaluationNarrationText,
     CAMPUS_GUIDE_BUBBLE_ID,
     CAMPUS_GUIDE_DIALOGUE,
+    EVALUATION_NPC_STATION_ID,
+    EVALUATION_RESPONSE_INSTRUCTION,
+    EVALUATION_RESPONSE_PROMPT,
+    getSimulationGuideBubbleId,
+    getSimulationGuideStationId,
     getNpcVoiceProfile,
     normalizeSpokenText,
     proposeVoiceAnswer,
@@ -20,6 +27,16 @@ test('cada globo visible tiene una narración autorizada con voz ecuatoriana', (
     assert.equal(campusGuide.zoneId, 'lobby');
     assert.equal(campusGuide.text, CAMPUS_GUIDE_DIALOGUE);
     assert.match(campusGuide.voice.voiceName, /^es-EC-(Andrea|Luis)Neural$/);
+
+    for (const stage of SIMULATION_STAGE_CATALOG) {
+        const stationId = getSimulationGuideStationId(stage.id);
+        const narration = resolveNarration(stationId, getSimulationGuideBubbleId(stage.id));
+        assert.ok(narration, stationId);
+        assert.equal(narration.zoneId, 'simulation-lab');
+        assert.equal(narration.label, stage.title);
+        assert.equal(narration.text, stage.guide.introduction);
+        assert.match(narration.voice.voiceName, /^es-EC-(Andrea|Luis)Neural$/);
+    }
 
     for (const station of TRAINING_STATIONS) {
         const activity = INDUCTION_ACTIVITIES[station.id];
@@ -38,6 +55,24 @@ test('cada globo visible tiene una narración autorizada con voz ecuatoriana', (
             }
         }
     }
+});
+
+test('dicta la pregunta, las opciones por letra y el cierre antes de escuchar', () => {
+    const profile = getNpcVoiceProfile(EVALUATION_NPC_STATION_ID);
+    assert.ok(profile);
+    assert.equal(profile.guideName, 'Guía de evaluación');
+    assert.match(profile.voiceName, /^es-EC-(Andrea|Luis)Neural$/);
+    assert.equal(
+        buildEvaluationNarrationText({
+            text: '¿Qué acción corresponde?',
+            options: [
+                { text: 'Reportar el incidente' },
+                { text: 'Ignorar el incidente' },
+                { text: 'Esperar hasta mañana' },
+            ],
+        }),
+        `¿Qué acción corresponde? Opción A: Reportar el incidente. Opción B: Ignorar el incidente. Opción C: Esperar hasta mañana. ${EVALUATION_RESPONSE_INSTRUCTION} ${EVALUATION_RESPONSE_PROMPT}`,
+    );
 });
 
 test('rechaza IDs de narración que no pertenecen al catálogo', () => {
@@ -67,6 +102,12 @@ test('selecciona opciones por número, letra o texto y exige una coincidencia cl
         { questionId: 'q1', optionId: 'personal', transcript: 'opción dos', status: 'matched' },
     );
     assert.equal(proposeVoiceAnswer('q1', 'respuesta A', options).optionId, 'corporate');
+    assert.equal(proposeVoiceAnswer('q1', 'A', options).optionId, 'corporate');
+    assert.equal(proposeVoiceAnswer('q1', 'B', options).optionId, 'personal');
+    assert.equal(proposeVoiceAnswer('q1', 'C', options).optionId, 'public');
+    assert.equal(proposeVoiceAnswer('q1', 'be', options).optionId, 'personal');
+    assert.equal(proposeVoiceAnswer('q1', 'opción b', options).optionId, 'personal');
+    assert.equal(proposeVoiceAnswer('q1', 'opcion c', options).optionId, 'public');
     assert.equal(
         proposeVoiceAnswer('q1', 'En las herramientas corporativas autorizadas', options).optionId,
         'corporate',

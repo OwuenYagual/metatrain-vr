@@ -16,8 +16,10 @@ import {
     updateThirdPersonOrbit,
 } from '../src/campus/campusCamera';
 import {
+    getVisibleInteractionTarget,
     getTrainingGuideFocusPosition,
     getTrainingStationPosition,
+    type CampusInteractionTarget,
 } from '../src/campus/campusTargets';
 
 const EPSILON = 0.000_001;
@@ -77,6 +79,27 @@ test('aplica sensibilidad horizontal y vertical sin mutar la órbita', () => {
     });
     assertApproximatelyEqual(updated.yaw, 0.48);
     assertApproximatelyEqual(updated.pitch, THIRD_PERSON_INITIAL_PITCH + 0.09);
+});
+
+test('mantiene visible la interacción de la etapa activa durante la simulación', () => {
+    const simulationStage: CampusInteractionTarget = {
+        id: 'simulation-stage-data_protection',
+        label: 'Inspeccionar correo sospechoso',
+        kind: 'simulation_stage',
+        position: [-3.25, 0, -2.85],
+        unlocked: true,
+    };
+    const terminal: CampusInteractionTarget = {
+        id: 'obj_simulation_terminal',
+        label: 'Reto del primer día',
+        kind: 'simulation_terminal',
+        position: [0, 0, -1.25],
+        unlocked: true,
+    };
+
+    assert.equal(getVisibleInteractionTarget(simulationStage, true), simulationStage);
+    assert.equal(getVisibleInteractionTarget(terminal, true), null);
+    assert.equal(getVisibleInteractionTarget(terminal, false), terminal);
 });
 
 test('acompaña suavemente la orientación del personaje al terminar el movimiento', () => {

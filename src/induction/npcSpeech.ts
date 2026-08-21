@@ -1,4 +1,5 @@
 import type { InductionActivity } from '../../shared/inductionActivities';
+import type { CampusZoneId } from '../../shared/campus';
 
 export const NPC_SPEECH_SPEED_OPTIONS = [
     { value: 'slow', label: 'Lenta', intervalMs: 40 },
@@ -49,6 +50,7 @@ export type NpcSpeechBubble = {
 };
 
 export type ActiveNpcSpeech = {
+    zoneId?: CampusZoneId;
     stationId: string;
     bubbleId: string;
     nextBubbleId?: string;

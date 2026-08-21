@@ -11,7 +11,7 @@ function UserIcon() {
     );
 }
 
-export function UserMenu() {
+export function UserMenu({ embedded = false }: { embedded?: boolean }) {
     const [open, setOpen] = useState(false);
     const navigate = useNavigate();
     const menuRef = useRef<HTMLDivElement>(null);
@@ -25,15 +25,16 @@ export function UserMenu() {
         };
         const closeOnEscape = (event: KeyboardEvent) => {
             if (event.key !== 'Escape') return;
+            event.stopImmediatePropagation();
             setOpen(false);
             triggerRef.current?.focus();
         };
 
         document.addEventListener('pointerdown', closeMenu);
-        window.addEventListener('keydown', closeOnEscape);
+        window.addEventListener('keydown', closeOnEscape, { capture: true });
         return () => {
             document.removeEventListener('pointerdown', closeMenu);
-            window.removeEventListener('keydown', closeOnEscape);
+            window.removeEventListener('keydown', closeOnEscape, { capture: true });
         };
     }, [open]);
 
@@ -43,7 +44,10 @@ export function UserMenu() {
     };
 
     return (
-        <div className="global-user-menu" ref={menuRef}>
+        <div
+            className={`global-user-menu ${embedded ? 'is-embedded' : ''}`}
+            ref={menuRef}
+        >
             {open && (
                 <div className="global-user-popover" role="menu" aria-label="Menú de usuario">
                     <button type="button" role="menuitem" onClick={logout}>Cerrar sesión</button>

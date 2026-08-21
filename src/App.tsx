@@ -9,8 +9,16 @@ import './App.css';
 const AvatarSelector = lazy(() => import('./avatar/AvatarSelector'));
 const CampusPage = lazy(() => import('./campus/CampusPage'));
 
-function ProtectedRoute({ children }: { children: ReactNode }) {
-    return authService.getCurrentSession() ? <>{children}<UserMenu /></> : <Navigate to="/login" replace />;
+function ProtectedRoute({
+    children,
+    showUserMenu = true,
+}: {
+    children: ReactNode;
+    showUserMenu?: boolean;
+}) {
+    return authService.getCurrentSession()
+        ? <>{children}{showUserMenu && <UserMenu />}</>
+        : <Navigate to="/login" replace />;
 }
 
 export default function App() {
@@ -27,7 +35,7 @@ export default function App() {
                         <ProtectedRoute><AvatarSelector /></ProtectedRoute>
                     } />
                     <Route path="/campus/:zoneId" element={
-                        <ProtectedRoute><CampusPage /></ProtectedRoute>
+                        <ProtectedRoute showUserMenu={false}><CampusPage /></ProtectedRoute>
                     } />
                     <Route path="/training" element={
                         <ProtectedRoute><Navigate to="/campus/induction-office" replace /></ProtectedRoute>

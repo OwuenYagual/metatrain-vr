@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getErrorMessage } from '../api/apiClient';
 import { APP_CONFIG } from '../config/appConfig';
 import { progressService } from '../progress/progressService';
+import { AuthLayout } from './AuthLayout';
 import { authService } from './authService';
 
 export default function AuthPage() {
@@ -40,13 +41,16 @@ export default function AuthPage() {
     };
 
     return (
-        <main style={{ padding: '2rem', maxWidth: '400px', margin: '0 auto' }}>
-            <h1 style={{ fontSize: '1.75rem' }}>Iniciar sesión</h1>
-            {error && <p role="alert" style={{ color: '#b91c1c' }}>{error}</p>}
+        <AuthLayout
+            eyebrow="Acceso al campus"
+            title="Iniciar sesión"
+            description="Continúa tu recorrido de capacitación desde el último punto guardado."
+        >
+            {error && <p role="alert" className="auth-message auth-message-error">{error}</p>}
 
-            <form onSubmit={handleLogin}>
-                <div style={{ marginBottom: '1rem' }}>
-                    <label htmlFor="login-email">Correo electrónico:</label>
+            <form className="auth-form" onSubmit={handleLogin}>
+                <div className="auth-field">
+                    <label htmlFor="login-email">Correo electrónico</label>
                     <input
                         id="login-email"
                         autoComplete="email"
@@ -54,11 +58,10 @@ export default function AuthPage() {
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         required
-                        style={{ width: '100%', padding: '0.5rem' }}
                     />
                 </div>
-                <div style={{ marginBottom: '1rem' }}>
-                    <label htmlFor="login-password">Contraseña:</label>
+                <div className="auth-field">
+                    <label htmlFor="login-password">Contraseña</label>
                     <input
                         id="login-password"
                         autoComplete="current-password"
@@ -66,16 +69,15 @@ export default function AuthPage() {
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         required
-                        style={{ width: '100%', padding: '0.5rem' }}
                     />
                 </div>
-                <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.75rem', cursor: 'pointer' }}>
+                <button className="auth-submit" type="submit" disabled={loading}>
                     {loading ? 'Ingresando...' : 'Ingresar'}
                 </button>
             </form>
-            <p style={{ marginTop: '1rem' }}>
+            <p className="auth-switch">
                 ¿No tienes cuenta? <Link to="/register">Regístrate aquí</Link>
             </p>
-        </main>
+        </AuthLayout>
     );
 }

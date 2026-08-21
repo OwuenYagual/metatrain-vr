@@ -17,7 +17,11 @@ import {
     getModuleInteractionObjectIds,
     MIN_PASSING_SCORE,
 } from '../../shared/trainingModule';
-import { getCompletedSimulationDecisionIds, SIMULATION_DECISION_IDS } from '../domain/simulation';
+import {
+    getCompletedSimulationDecisionIds,
+    hasCompletedSimulationRun,
+    SIMULATION_DECISION_IDS,
+} from '../domain/simulation';
 import { progressIdentityFilter } from '../domain/campusAccess';
 
 const router = Router();
@@ -69,7 +73,10 @@ async function getEligibleProgress(
 
     const progress = await TrainingProgress.findOne(progressIdentityFilter(participantId, moduleId));
     const hasPreviousEvaluation = Boolean(await EvaluationResult.exists({ participantId, moduleId }));
-    const requiredSimulationDecisionIds = hasPreviousEvaluation ? [] : SIMULATION_DECISION_IDS;
+    const completedWithImmersiveRun = hasCompletedSimulationRun(progress?.simulationRuns);
+    const requiredSimulationDecisionIds = hasPreviousEvaluation || completedWithImmersiveRun
+        ? []
+        : SIMULATION_DECISION_IDS;
     const requirements = summarizeEvaluationRequirements({
         requiredContentIds: requiredContents.map((content) => String(content._id)),
         completedContentIds: progress?.completedContents ?? [],

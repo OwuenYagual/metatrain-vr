@@ -12,11 +12,11 @@ import {
 } from '../../shared/campus';
 import { TRAINING_INTERACTION_OBJECT_IDS } from '../../shared/trainingModule';
 import type { ITrainingProgress } from '../models/progress.model';
-import { getCompletedSimulationDecisionIds, SIMULATION_DECISION_IDS } from './simulation';
+import { isSimulationCompleted } from './simulation';
 
 export type ProgressAccessSource = Pick<
     ITrainingProgress,
-    'completedContents' | 'simulationDecisions' | 'status' | 'lastLocation'
+    'completedContents' | 'simulationDecisions' | 'simulationRuns' | 'status' | 'lastLocation'
 >;
 
 export function progressIdentityFilter(
@@ -42,12 +42,9 @@ export function getCampusProgressState(
     const completedContents = new Set(progress?.completedContents ?? []);
     const trainingCompleted = requiredContentIds.length === TRAINING_INTERACTION_OBJECT_IDS.length
         && requiredContentIds.every((contentId) => completedContents.has(contentId));
-    const completedSimulationIds = progress
-        ? getCompletedSimulationDecisionIds(progress.simulationDecisions ?? [])
-        : [];
     return {
         trainingCompleted,
-        simulationCompleted: completedSimulationIds.length === SIMULATION_DECISION_IDS.length,
+        simulationCompleted: isSimulationCompleted(progress),
         approved: progress?.status === 'approved',
     };
 }

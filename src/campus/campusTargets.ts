@@ -12,7 +12,7 @@ import {
     TRAINING_STATIONS,
 } from '../../shared/trainingModule';
 
-export type CampusInteractionKind = InteractableManifest['kind'] | 'portal';
+export type CampusInteractionKind = InteractableManifest['kind'] | 'portal' | 'simulation_stage';
 
 export type CampusInteractionTarget = {
     id: string;
@@ -23,6 +23,14 @@ export type CampusInteractionTarget = {
     lockedMessage?: string;
     portal?: PortalManifest;
 };
+
+export function getVisibleInteractionTarget(
+    nearbyTarget: CampusInteractionTarget | null,
+    simulationActive: boolean,
+): CampusInteractionTarget | null {
+    if (!simulationActive) return nearbyTarget;
+    return nearbyTarget?.kind === 'simulation_stage' ? nearbyTarget : null;
+}
 
 const STATION_POSITIONS = new Map<string, Vector3Tuple>(
     TRAINING_STATIONS.map((station) => [
@@ -54,6 +62,7 @@ export function getLockedMessage(kind: CampusInteractionKind): string {
     if (kind === 'evaluation_terminal') return 'Completa el laboratorio de simulación.';
     if (kind === 'certificate_kiosk') return 'Aprueba la evaluación para emitir tu certificado.';
     if (kind === 'training_station') return 'Completa primero la estación anterior.';
+    if (kind === 'simulation_stage') return 'Completa primero la situación anterior.';
     return 'Completa la etapa anterior para abrir esta puerta.';
 }
 

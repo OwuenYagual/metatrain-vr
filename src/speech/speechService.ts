@@ -1,5 +1,8 @@
 import type { SpeechCapabilities, TranscriptionResult } from '../../shared/speech';
-import { CAMPUS_GUIDE_OBJECT_ID } from '../../shared/campus';
+import {
+    CAMPUS_GUIDE_OBJECT_ID,
+    type CampusZoneId,
+} from '../../shared/campus';
 import { apiFetch } from '../api/apiClient';
 import { APP_CONFIG } from '../config/appConfig';
 
@@ -23,14 +26,42 @@ function isTranscriptionResult(value: unknown): value is TranscriptionResult {
         && (candidate.confidence === undefined || typeof candidate.confidence === 'number');
 }
 
-function narrationPath(stationId: string, bubbleId: string): string {
-    const zoneId = stationId === CAMPUS_GUIDE_OBJECT_ID ? 'lobby' : 'induction-office';
+function narrationPath(stationId: string, bubbleId: string, requestedZoneId?: CampusZoneId): string {
+    const zoneId = requestedZoneId
+        ?? (stationId === CAMPUS_GUIDE_OBJECT_ID ? 'lobby' : 'induction-office');
     const query = new URLSearchParams({
         moduleVersion: String(APP_CONFIG.TRAINING_MODULE_VERSION),
         worldVersion: String(APP_CONFIG.CAMPUS_WORLD_VERSION),
         zoneId,
     });
     return `/speech/narrations/${encodeURIComponent(APP_CONFIG.TRAINING_MODULE_ID)}/${encodeURIComponent(stationId)}/${encodeURIComponent(bubbleId)}?${query}`;
+}
+
+function evaluationNarrationPath(questionId: string): string {
+    const query = new URLSearchParams({
+        moduleVersion: String(APP_CONFIG.TRAINING_MODULE_VERSION),
+        worldVersion: String(APP_CONFIG.CAMPUS_WORLD_VERSION),
+        zoneId: 'assessment-room',
+    });
+    return `/speech/evaluation-narrations/${encodeURIComponent(APP_CONFIG.TRAINING_MODULE_ID)}/${encodeURIComponent(questionId)}?${query}`;
+}
+
+async function cacheNarration(key: string, path: string): Promise<string> {
+    const cached = narrationCache.get(key);
+    if (cached) return cached;
+    const response = await apiFetch(path);
+    const blob = await response.blob();
+    if (!blob.type.startsWith('audio/')) throw new Error('La narración recibida no es audio válido.');
+    const objectUrl = URL.createObjectURL(blob);
+    if (narrationCache.size >= MAX_CACHED_NARRATIONS) {
+        const oldest = narrationCache.entries().next().value as [string, string] | undefined;
+        if (oldest) {
+            URL.revokeObjectURL(oldest[1]);
+            narrationCache.delete(oldest[0]);
+        }
+    }
+    narrationCache.set(key, objectUrl);
+    return objectUrl;
 }
 
 export const speechService = {
@@ -43,27 +74,28 @@ export const speechService = {
         return payload;
     },
 
-    async getNarration(stationId: string, bubbleId: string): Promise<string> {
-        const key = `${stationId}:${bubbleId}`;
-        const cached = narrationCache.get(key);
-        if (cached) return cached;
-        const response = await apiFetch(narrationPath(stationId, bubbleId));
-        const blob = await response.blob();
-        if (!blob.type.startsWith('audio/')) throw new Error('La narración recibida no es audio válido.');
-        const objectUrl = URL.createObjectURL(blob);
-        if (narrationCache.size >= MAX_CACHED_NARRATIONS) {
-            const oldest = narrationCache.entries().next().value as [string, string] | undefined;
-            if (oldest) {
-                URL.revokeObjectURL(oldest[1]);
-                narrationCache.delete(oldest[0]);
-            }
-        }
-        narrationCache.set(key, objectUrl);
-        return objectUrl;
+    async getNarration(
+        stationId: string,
+        bubbleId: string,
+        zoneId?: CampusZoneId,
+    ): Promise<string> {
+        const key = `${zoneId ?? 'default'}:${stationId}:${bubbleId}`;
+        return cacheNarration(key, narrationPath(stationId, bubbleId, zoneId));
     },
 
-    async preloadNarration(stationId: string, bubbleId: string): Promise<void> {
-        await this.getNarration(stationId, bubbleId);
+    async preloadNarration(
+        stationId: string,
+        bubbleId: string,
+        zoneId?: CampusZoneId,
+    ): Promise<void> {
+        await this.getNarration(stationId, bubbleId, zoneId);
+    },
+
+    async getEvaluationNarration(questionId: string): Promise<string> {
+        return cacheNarration(
+            `assessment-room:evaluation:${questionId}`,
+            evaluationNarrationPath(questionId),
+        );
     },
 
     async transcribe(

@@ -8,6 +8,7 @@ import {
 import type { CampusCameraMode } from './CampusPlayer';
 import type { CampusInteractionTarget } from './campusTargets';
 import { StatusIcon } from '../components/StatusIcon';
+import { UserMenu } from '../auth/UserMenu';
 
 type HudZone = {
     id: CampusZoneId;
@@ -56,6 +57,7 @@ export function CampusHud({
     cameraMode,
     quality,
     nearbyTarget,
+    hideStatusPanel,
     zones,
     audio,
     controlsOpen,
@@ -76,6 +78,7 @@ export function CampusHud({
     cameraMode: CampusCameraMode;
     quality: 'high' | 'adaptive';
     nearbyTarget: CampusInteractionTarget | null;
+    hideStatusPanel: boolean;
     zones: readonly HudZone[];
     audio: {
         started: boolean;
@@ -98,54 +101,56 @@ export function CampusHud({
     const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
     return (
         <>
-            <section className="campus-hud" aria-label="Estado del campus">
-                <header className="campus-hud-heading">
-                    <div>
-                        <p>Campus MetaTrain</p>
-                        <h1>{zoneTitle}</h1>
-                    </div>
-                    <button
-                        type="button"
-                        className="campus-icon-button"
-                        aria-label={controlsOpen ? 'Ocultar ayuda de controles' : 'Mostrar ayuda de controles'}
-                        aria-expanded={controlsOpen}
-                        onClick={onControlsToggle}
-                    >
-                        ?
-                    </button>
-                </header>
-
-                <p className="campus-objective"><span>Siguiente objetivo</span>{objective}</p>
-                <div className="campus-progress-row">
-                    <div>
-                        <span>Inducción</span>
-                        <strong>{completedCount}/{totalCount}</strong>
-                    </div>
-                    <progress aria-label="Progreso de inducción" value={completedCount} max={Math.max(1, totalCount)} />
-                    <small>{percentage}% completado</small>
-                </div>
-
-                <ol className="campus-zone-route" aria-label="Etapas del campus">
-                    {zones.map((zone, index) => (
-                        <li
-                            key={zone.id}
-                            className={`${zone.current ? 'is-current' : ''} ${zone.completed ? 'is-completed' : ''} ${zone.unlocked ? '' : 'is-locked'}`}
-                            aria-current={zone.current ? 'step' : undefined}
+            {!hideStatusPanel && (
+                <section className="campus-hud" aria-label="Estado del campus">
+                    <header className="campus-hud-heading">
+                        <div>
+                            <p>Campus MetaTrain</p>
+                            <h1>{zoneTitle}</h1>
+                        </div>
+                        <button
+                            type="button"
+                            className="campus-icon-button"
+                            aria-label={controlsOpen ? 'Ocultar ayuda de controles' : 'Mostrar ayuda de controles'}
+                            aria-expanded={controlsOpen}
+                            onClick={onControlsToggle}
                         >
-                            <span aria-hidden="true">
-                                {zone.completed
-                                    ? <StatusIcon name="check" />
-                                    : zone.unlocked ? index + 1 : <StatusIcon name="lock" />}
-                            </span>
-                            <span className="campus-zone-route-label">{zone.title}</span>
-                        </li>
-                    ))}
-                </ol>
+                            ?
+                        </button>
+                    </header>
 
-                <p className="campus-quality" title="La calidad se ajusta automáticamente según el rendimiento.">
-                    Calidad: {quality === 'high' ? 'alta' : 'adaptable'}
-                </p>
-            </section>
+                    <p className="campus-objective"><span>Siguiente objetivo</span>{objective}</p>
+                    <div className="campus-progress-row">
+                        <div>
+                            <span>Inducción</span>
+                            <strong>{completedCount}/{totalCount}</strong>
+                        </div>
+                        <progress aria-label="Progreso de inducción" value={completedCount} max={Math.max(1, totalCount)} />
+                        <small>{percentage}% completado</small>
+                    </div>
+
+                    <ol className="campus-zone-route" aria-label="Etapas del campus">
+                        {zones.map((zone, index) => (
+                            <li
+                                key={zone.id}
+                                className={`${zone.current ? 'is-current' : ''} ${zone.completed ? 'is-completed' : ''} ${zone.unlocked ? '' : 'is-locked'}`}
+                                aria-current={zone.current ? 'step' : undefined}
+                            >
+                                <span aria-hidden="true">
+                                    {zone.completed
+                                        ? <StatusIcon name="check" />
+                                        : zone.unlocked ? index + 1 : <StatusIcon name="lock" />}
+                                </span>
+                                <span className="campus-zone-route-label">{zone.title}</span>
+                            </li>
+                        ))}
+                    </ol>
+
+                    <p className="campus-quality" title="La calidad se ajusta automáticamente según el rendimiento.">
+                        Calidad: {quality === 'high' ? 'alta' : 'adaptable'}
+                    </p>
+                </section>
+            )}
 
             <nav className="campus-quick-controls" aria-label="Acciones rápidas del campus">
                 <button
@@ -178,6 +183,7 @@ export function CampusHud({
                 >
                     <span aria-hidden="true">≡</span>
                 </button>
+                <UserMenu embedded />
             </nav>
 
             {audioSettingsOpen && (
@@ -225,7 +231,7 @@ export function CampusHud({
                 </section>
             )}
 
-            {controlsOpen && (
+            {!hideStatusPanel && controlsOpen && (
                 <section className="campus-controls-help" aria-label="Controles del campus">
                     <div><kbd>WASD</kbd><span>Caminar</span></div>
                     <div><kbd>Shift</kbd><span>Correr</span></div>

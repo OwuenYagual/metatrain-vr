@@ -35,6 +35,7 @@ export function useNpcNarration({
     const stationId = speech?.stationId ?? '';
     const bubbleId = speech?.bubbleId ?? '';
     const nextBubbleId = speech?.nextBubbleId;
+    const zoneId = speech?.zoneId;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -66,7 +67,7 @@ export function useNpcNarration({
         setError('');
         setStatus('loading');
         try {
-            const source = await speechService.getNarration(stationId, bubbleId);
+            const source = await speechService.getNarration(stationId, bubbleId, zoneId);
             if (requestIdRef.current !== requestId) return;
             const audio = new Audio(source);
             audio.volume = voiceVolume;
@@ -88,7 +89,7 @@ export function useNpcNarration({
             };
             await audio.play();
             if (nextBubbleId) {
-                void speechService.preloadNarration(stationId, nextBubbleId).catch(() => undefined);
+                void speechService.preloadNarration(stationId, nextBubbleId, zoneId).catch(() => undefined);
             }
         } catch (requestError: unknown) {
             if (requestIdRef.current !== requestId) return;
@@ -96,7 +97,7 @@ export function useNpcNarration({
             setError(getErrorMessage(requestError, 'No se pudo cargar la narración.'));
             onDuckedChange(false);
         }
-    }, [audioStarted, available, bubbleId, enabled, muted, nextBubbleId, onDuckedChange, stationId, stop, voiceVolume]);
+    }, [audioStarted, available, bubbleId, enabled, muted, nextBubbleId, onDuckedChange, stationId, stop, voiceVolume, zoneId]);
 
     useEffect(() => {
         void play(true);

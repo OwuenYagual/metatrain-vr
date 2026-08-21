@@ -24,6 +24,10 @@ import {
     CampusZoneEnvironment,
 } from './CampusZones';
 import type { CampusInteractionTarget } from './campusTargets';
+import type {
+    SimulationLabSceneState,
+    SimulationLabStageId,
+} from './simulationLabScene';
 
 type ZoneVisualSettings = {
     background: string;
@@ -93,6 +97,9 @@ export function CampusWorld({
     onStep,
     onCanvasReady,
     onQualityChange,
+    hideSceneLabels,
+    simulationSceneState,
+    onSimulationStageInteract,
 }: {
     zoneId: CampusZoneId;
     spawn: SpawnManifest;
@@ -110,6 +117,9 @@ export function CampusWorld({
     onStep: () => void;
     onCanvasReady: (canvas: HTMLCanvasElement) => void;
     onQualityChange: (quality: 'high' | 'adaptive') => void;
+    hideSceneLabels: boolean;
+    simulationSceneState?: SimulationLabSceneState;
+    onSimulationStageInteract?: (stageId: SimulationLabStageId) => void;
 }) {
     const [lowQuality, setLowQuality] = useState(false);
     const webGlAvailable = useMemo(() => supportsWebGL(), []);
@@ -174,8 +184,10 @@ export function CampusWorld({
                         targets={targets}
                         nearbyTargetId={nearbyTargetId}
                         lowQuality={lowQuality}
-                        hideStationTitles={zoneId === 'assessment-room' && paused}
+                        hideStationTitles={hideSceneLabels}
+                        simulationSceneState={simulationSceneState}
                         onInteract={onInteract}
+                        onSimulationStageInteract={onSimulationStageInteract}
                     />
                     <CampusPlayer
                         avatarId={avatarId}

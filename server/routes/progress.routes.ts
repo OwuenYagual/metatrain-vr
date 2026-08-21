@@ -22,7 +22,11 @@ import {
     validateLocationInput,
     validateProgressItemInput,
 } from '../domain/progress';
-import { getCompletedSimulationDecisionIds, SIMULATION_DECISION_IDS } from '../domain/simulation';
+import {
+    getCompletedSimulationDecisionIds,
+    getLatestSimulationRun,
+    isSimulationCompleted,
+} from '../domain/simulation';
 import { authenticate, canAccessParticipant } from '../middleware/auth.middleware';
 import TrainingContent from '../models/content.model';
 import TrainingProgress, { type ITrainingProgress } from '../models/progress.model';
@@ -50,6 +54,7 @@ async function getRequiredContentIds(moduleId: string): Promise<string[]> {
 
 function progressSummary(progress: ITrainingProgress, requiredContentIds: readonly string[]) {
     const completedSimulationDecisionIds = getCompletedSimulationDecisionIds(progress.simulationDecisions ?? []);
+    const latestSimulationRun = getLatestSimulationRun(progress.simulationRuns);
     const access = getCampusProgressState(progress, requiredContentIds);
     return {
         participantId: progress.participantId,
@@ -61,7 +66,9 @@ function progressSummary(progress: ITrainingProgress, requiredContentIds: readon
         interactionCount: (progress.interactions ?? []).length,
         simulationDecisionCount: (progress.simulationDecisions ?? []).length,
         completedSimulationDecisionIds,
-        simulationCompleted: completedSimulationDecisionIds.length === SIMULATION_DECISION_IDS.length,
+        simulationRunCount: (progress.simulationRuns ?? []).length,
+        latestSimulationRunId: latestSimulationRun?.runId ?? null,
+        simulationCompleted: isSimulationCompleted(progress),
         score: progress.score,
         status: progress.status,
         durationSeconds: progress.durationSeconds,

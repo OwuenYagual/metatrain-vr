@@ -1,4 +1,14 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import {
+    SIMULATION_EVIDENCE_OBJECT_IDS,
+    SIMULATION_STAGE_IDS,
+    type SimulationAttemptKind,
+    type SimulationAttemptResult,
+    type SimulationEvidenceObjectId,
+    type SimulationRunStatus,
+    type SimulationStageId,
+    type SimulationStageStatus,
+} from '../../shared/simulation';
 
 export const LEGACY_MODULE_VERSION = 1;
 export const LEGACY_WORLD_VERSION = 1;
@@ -36,6 +46,44 @@ export interface ISimulationDecision {
     timestamp: Date;
 }
 
+export interface ISimulationInspection {
+    clientEventId: string;
+    stageId: SimulationStageId;
+    objectId: SimulationEvidenceObjectId;
+    timestamp: Date;
+}
+
+export interface ISimulationAttempt {
+    clientEventId: string;
+    stageId: SimulationStageId;
+    actionId: string;
+    kind: SimulationAttemptKind;
+    result: SimulationAttemptResult;
+    consequence: string;
+    timestamp: Date;
+}
+
+export interface ISimulationStageProgress {
+    stageId: SimulationStageId;
+    status: SimulationStageStatus;
+    inspections: ISimulationInspection[];
+    attempts: ISimulationAttempt[];
+    completedAt?: Date;
+}
+
+export interface ISimulationRun {
+    runId: string;
+    simulationVersion: number;
+    scenarioId: string;
+    status: SimulationRunStatus;
+    currentStageId?: SimulationStageId;
+    startClientEventIds: string[];
+    startedAt: Date;
+    completedAt?: Date;
+    lastUpdatedAt: Date;
+    stages: ISimulationStageProgress[];
+}
+
 // Interfaz principal del progreso 
 export interface ITrainingProgress extends Document {
     participantId: mongoose.Types.ObjectId;
@@ -49,6 +97,7 @@ export interface ITrainingProgress extends Document {
     completedContents: string[];
     interactions: IInteractionEvent[];
     simulationDecisions: ISimulationDecision[];
+    simulationRuns?: ISimulationRun[];
     score: number | null;
     status: 'not_started' | 'in_progress' | 'approved' | 'failed';
     durationSeconds: number;
@@ -87,6 +136,51 @@ const SimulationDecisionSchema = new Schema<ISimulationDecision>({
     timestamp: { type: Date, default: Date.now }
 }, { _id: false });
 
+const SimulationInspectionSchema = new Schema<ISimulationInspection>({
+    clientEventId: { type: String, required: true, trim: true, maxlength: 100 },
+    stageId: { type: String, enum: SIMULATION_STAGE_IDS, required: true },
+    objectId: { type: String, enum: SIMULATION_EVIDENCE_OBJECT_IDS, required: true },
+    timestamp: { type: Date, required: true, default: Date.now },
+}, { _id: false });
+
+const SimulationAttemptSchema = new Schema<ISimulationAttempt>({
+    clientEventId: { type: String, required: true, trim: true, maxlength: 100 },
+    stageId: { type: String, enum: SIMULATION_STAGE_IDS, required: true },
+    actionId: { type: String, required: true, trim: true, maxlength: 100 },
+    kind: { type: String, enum: ['initial', 'correction'], required: true },
+    result: { type: String, enum: ['consequence', 'resolved'], required: true },
+    consequence: { type: String, required: true, maxlength: 1000 },
+    timestamp: { type: Date, required: true, default: Date.now },
+}, { _id: false });
+
+const SimulationStageProgressSchema = new Schema<ISimulationStageProgress>({
+    stageId: { type: String, enum: SIMULATION_STAGE_IDS, required: true },
+    status: {
+        type: String,
+        enum: ['locked', 'awaiting_inspection', 'ready_for_action', 'pending_correction', 'completed'],
+        required: true,
+    },
+    inspections: { type: [SimulationInspectionSchema], default: [] },
+    attempts: { type: [SimulationAttemptSchema], default: [] },
+    completedAt: { type: Date },
+}, { _id: false });
+
+const SimulationRunSchema = new Schema<ISimulationRun>({
+    runId: { type: String, required: true, trim: true, maxlength: 100 },
+    simulationVersion: { type: Number, required: true, min: 1 },
+    scenarioId: { type: String, required: true, trim: true, maxlength: 100 },
+    status: { type: String, enum: ['in_progress', 'completed', 'abandoned'], required: true },
+    currentStageId: { type: String, enum: SIMULATION_STAGE_IDS },
+    startClientEventIds: {
+        type: [{ type: String, required: true, trim: true, maxlength: 100 }],
+        default: [],
+    },
+    startedAt: { type: Date, required: true, default: Date.now },
+    completedAt: { type: Date },
+    lastUpdatedAt: { type: Date, required: true, default: Date.now },
+    stages: { type: [SimulationStageProgressSchema], required: true, default: [] },
+}, { _id: false });
+
 // Esquema Principal 
 const TrainingProgressSchema = new Schema<ITrainingProgress>({
     participantId: { type: Schema.Types.ObjectId, ref: 'Participant', required: true },
@@ -103,6 +197,7 @@ const TrainingProgressSchema = new Schema<ITrainingProgress>({
     completedContents: [{ type: String, maxlength: 100 }],
     interactions: { type: [InteractionEventSchema], default: [] },
     simulationDecisions: { type: [SimulationDecisionSchema], default: [] },
+    simulationRuns: { type: [SimulationRunSchema], default: undefined },
     score: { type: Number, default: null, min: 0, max: 100 },
     status: {
         type: String,

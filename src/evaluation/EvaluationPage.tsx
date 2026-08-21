@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../auth/authService';
@@ -14,15 +14,26 @@ import {
     type CertificateSummary,
 } from '../certificate/certificateService';
 import { useVoiceAnswer } from '../speech/useVoiceAnswer';
+import { useEvaluationNarration } from '../speech/useEvaluationNarration';
 import { StatusIcon } from '../components/StatusIcon';
 import './EvaluationPage.css';
 
 const ignoreMicrophoneState = () => undefined;
 
+function optionLabel(index: number): string {
+    return String.fromCharCode(65 + index);
+}
+
 export default function EvaluationPage({
     onMicrophoneActiveChange = ignoreMicrophoneState,
+    audioStarted = true,
+    narrationMuted = false,
+    voiceVolume = 0.85,
 }: {
     onMicrophoneActiveChange?: (active: boolean) => void;
+    audioStarted?: boolean;
+    narrationMuted?: boolean;
+    voiceVolume?: number;
 }) {
     const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
     const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -33,13 +44,43 @@ export default function EvaluationPage({
     const [submitting, setSubmitting] = useState(false);
     const [downloadingCertificate, setDownloadingCertificate] = useState(false);
     const [error, setError] = useState('');
+    const [attemptId, setAttemptId] = useState(0);
+    const [voiceTranscripts, setVoiceTranscripts] = useState<Record<string, string>>({});
+    const questionElementsRef = useRef(new Map<string, HTMLFieldSetElement>());
+    const submitButtonRef = useRef<HTMLButtonElement | null>(null);
     const navigate = useNavigate();
     const session = authService.getCurrentSession();
-    const voice = useVoiceAnswer(onMicrophoneActiveChange);
+    const applyMatchedVoiceAnswer = useCallback((
+        questionId: string,
+        optionId: string,
+        transcript: string,
+    ) => {
+        setAnswers((current) => ({ ...current, [questionId]: optionId }));
+        setVoiceTranscripts((current) => ({ ...current, [questionId]: transcript }));
+    }, []);
+    const voice = useVoiceAnswer(onMicrophoneActiveChange, applyMatchedVoiceAnswer);
+    const narrationEnabled = Boolean(
+        voice.capabilities?.narrationAvailable && audioStarted && !narrationMuted && !result,
+    );
+    const narration = useEvaluationNarration({
+        enabled: narrationEnabled,
+        volume: voiceVolume,
+        onDuckedChange: onMicrophoneActiveChange,
+    });
+    const beginVoiceAnswer = voice.begin;
+    const cancelVoiceAnswer = voice.cancel;
+    const transcriptionAvailable = voice.capabilities?.transcriptionAvailable;
+    const playNarration = narration.play;
+    const stopNarration = narration.stop;
     const answeredCount = useMemo(
         () => questions.filter((question) => Boolean(answers[question.id])).length,
         [answers, questions],
     );
+    const activeQuestionIndex = useMemo(
+        () => questions.findIndex((question) => !answers[question.id]),
+        [answers, questions],
+    );
+    const activeQuestion = activeQuestionIndex >= 0 ? questions[activeQuestionIndex] : null;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -65,9 +106,56 @@ export default function EvaluationPage({
         return () => controller.abort();
     }, []);
 
+    useEffect(() => {
+        if (!activeQuestion || !narrationEnabled) return undefined;
+        const question = activeQuestion;
+        const timer = window.setTimeout(() => {
+            playNarration(question, () => {
+                if (transcriptionAvailable) {
+                    void beginVoiceAnswer(question, 'automatic');
+                }
+            });
+        }, 240);
+        return () => {
+            window.clearTimeout(timer);
+            stopNarration();
+        };
+    }, [
+        activeQuestion,
+        attemptId,
+        beginVoiceAnswer,
+        narrationEnabled,
+        playNarration,
+        stopNarration,
+        transcriptionAvailable,
+    ]);
+
+    useEffect(() => {
+        if (loading || result || questions.length === 0) return undefined;
+        const target = activeQuestion
+            ? questionElementsRef.current.get(activeQuestion.id)
+            : answeredCount === questions.length
+                ? submitButtonRef.current
+                : null;
+        if (!target) return undefined;
+
+        const frame = window.requestAnimationFrame(() => {
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            target.focus({ preventScroll: true });
+            target.scrollIntoView({
+                behavior: reduceMotion ? 'auto' : 'smooth',
+                block: 'center',
+                inline: 'nearest',
+            });
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [activeQuestion, answeredCount, loading, questions.length, result]);
+
     const submitEvaluation = async (event: FormEvent) => {
         event.preventDefault();
         if (answeredCount !== questions.length) return;
+        stopNarration();
+        cancelVoiceAnswer();
         setSubmitting(true);
         setError('');
         try {
@@ -88,11 +176,28 @@ export default function EvaluationPage({
     };
 
     const retryEvaluation = () => {
-        voice.cancel();
+        stopNarration();
+        cancelVoiceAnswer();
         setAnswers({});
+        setVoiceTranscripts({});
+        setAttemptId((current) => current + 1);
         setResult(null);
         setError('');
     };
+
+    const selectAnswer = useCallback((questionId: string, optionId: string) => {
+        if (questionId === activeQuestion?.id) {
+            stopNarration();
+            cancelVoiceAnswer();
+        }
+        setAnswers((current) => ({ ...current, [questionId]: optionId }));
+        setVoiceTranscripts((current) => {
+            if (!current[questionId]) return current;
+            const next = { ...current };
+            delete next[questionId];
+            return next;
+        });
+    }, [activeQuestion?.id, cancelVoiceAnswer, stopNarration]);
 
     const downloadCertificate = async () => {
         setDownloadingCertificate(true);
@@ -200,113 +305,172 @@ export default function EvaluationPage({
 
                 {!loading && !result && questions.length > 0 && (
                     <form onSubmit={submitEvaluation}>
-                        <p id="evaluation-instructions" style={{ padding: '0.85rem', background: '#eff6ff', color: '#1e40af', borderRadius: 8 }}>
-                            Mantén pulsado el micrófono, di el número o el texto de una opción y confirma la respuesta
-                            reconocida. Necesitas {passingScore}% para aprobar.
+                        <p id="evaluation-instructions" className="evaluation-instructions">
+                            El NPC leerá cada pregunta y sus opciones. Cuando pregunte “¿Cuál es tu respuesta?”,
+                            el micrófono se activará automáticamente. Responde únicamente “A”, “B” o la letra
+                            correspondiente. Necesitas {passingScore}% para aprobar.
                         </p>
                         {voice.capabilities && !voice.capabilities.transcriptionAvailable && (
                             <p role="status" className="voice-answer-unavailable">
-                                Las respuestas por voz no están disponibles en este momento.
+                                Las respuestas por voz no están disponibles en este momento. Puedes seleccionar
+                                las opciones manualmente.
                             </p>
                         )}
-                        <p aria-live="polite" style={{ margin: '1rem 0', fontWeight: 700 }}>
+                        <p aria-live="polite" className="evaluation-progress">
                             {answeredCount} de {questions.length} respondidas
                         </p>
-                        <div style={{ display: 'grid', gap: '1rem' }}>
-                            {questions.map((question, questionIndex) => (
-                                <fieldset key={question.id} disabled={submitting} aria-describedby="evaluation-instructions" style={{ padding: '1rem', border: '1px solid #cbd5e1', borderRadius: 10 }}>
-                                    <legend style={{ padding: '0 0.4rem', fontWeight: 700 }}>
-                                        {questionIndex + 1}. {question.text}
-                                    </legend>
-                                    <div className="voice-answer-controls">
-                                        <button
-                                            type="button"
-                                            className={voice.activeQuestionId === question.id && voice.status === 'listening' ? 'is-listening' : ''}
-                                            disabled={submitting
-                                                || voice.capabilities?.transcriptionAvailable === false
-                                                || (voice.activeQuestionId !== null
-                                                    && voice.activeQuestionId !== question.id
-                                                    && ['requesting', 'listening', 'processing'].includes(voice.status))}
-                                            aria-label={`Mantener para responder por voz la pregunta ${questionIndex + 1}`}
-                                            onPointerDown={(event) => {
-                                                event.preventDefault();
-                                                event.currentTarget.setPointerCapture(event.pointerId);
-                                                void voice.begin(question);
-                                            }}
-                                            onPointerUp={(event) => {
-                                                event.preventDefault();
-                                                voice.end();
-                                            }}
-                                            onPointerCancel={voice.end}
-                                            onKeyDown={(event) => {
-                                                if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
-                                                    event.preventDefault();
-                                                    void voice.begin(question);
-                                                }
-                                            }}
-                                            onKeyUp={(event) => {
-                                                if (event.key === ' ' || event.key === 'Enter') {
-                                                    event.preventDefault();
-                                                    voice.end();
-                                                }
-                                            }}
-                                        >
-                                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                <rect x="9" y="3" width="6" height="11" rx="3" />
-                                                <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" />
-                                            </svg>
-                                        </button>
+                        <div className="evaluation-question-list">
+                            {questions.map((question, questionIndex) => {
+                                const isActiveQuestion = question.id === activeQuestion?.id;
+                                const isListening = voice.activeQuestionId === question.id
+                                    && voice.status === 'listening';
+                                const isNarrating = narration.activeQuestionId === question.id
+                                    && (narration.status === 'loading' || narration.status === 'playing');
+                                const exampleId = `voice-answer-example-${question.id}`;
 
-                                        <p className="voice-answer-status" aria-live="polite">
-                                            {voice.activeQuestionId === question.id && voice.status === 'requesting'
-                                                ? 'Permitiendo micrófono…'
-                                                : voice.activeQuestionId === question.id && voice.status === 'listening'
-                                                    ? 'Escuchando… suelta para enviar'
-                                                    : voice.activeQuestionId === question.id && voice.status === 'processing'
-                                                        ? 'Reconociendo respuesta…'
-                                                        : answers[question.id]
-                                                            ? 'Respuesta confirmada'
-                                                            : 'Mantén pulsado para responder'}
-                                        </p>
+                                return (
+                                    <fieldset
+                                        key={question.id}
+                                        ref={(element) => {
+                                            if (element) questionElementsRef.current.set(question.id, element);
+                                            else questionElementsRef.current.delete(question.id);
+                                        }}
+                                        tabIndex={-1}
+                                        disabled={submitting}
+                                        aria-describedby="evaluation-instructions"
+                                        className={`evaluation-question ${isActiveQuestion ? 'is-active' : ''} ${answers[question.id] ? 'is-answered' : ''}`}
+                                    >
+                                        <legend>
+                                            <span>Pregunta {questionIndex + 1}</span>
+                                            {question.text}
+                                        </legend>
 
-                                        {voice.activeQuestionId === question.id && voice.status === 'error' && (
-                                            <div role="alert" className="voice-answer-feedback is-error">
-                                                <p>{voice.error}</p>
-                                                <button type="button" onClick={voice.cancel}>Cerrar</button>
-                                            </div>
-                                        )}
+                                        <div className="evaluation-options">
+                                            {question.options.map((option, optionIndex) => (
+                                                <label
+                                                    className={answers[question.id] === option.id ? 'is-selected' : ''}
+                                                    key={option.id}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name={`question-${question.id}`}
+                                                        value={option.id}
+                                                        checked={answers[question.id] === option.id}
+                                                        onChange={() => selectAnswer(question.id, option.id)}
+                                                    />
+                                                    <span className="evaluation-option-letter" aria-hidden="true">
+                                                        {optionLabel(optionIndex)}
+                                                    </span>
+                                                    <span>{option.text}</span>
+                                                </label>
+                                            ))}
+                                        </div>
 
-                                        {voice.activeQuestionId === question.id && voice.proposal && (
-                                            <div role="status" aria-live="polite" className="voice-answer-feedback">
-                                                <p><strong>Se entendió:</strong> “{voice.proposal.transcript}”</p>
-                                                {voice.proposal.status === 'matched' && voice.proposal.optionId ? (
-                                                    <p>
-                                                        <strong>Opción propuesta:</strong>{' '}
-                                                        {question.options.find(({ id }) => id === voice.proposal?.optionId)?.text}
-                                                    </p>
-                                                ) : (
-                                                    <p>No hay una coincidencia clara. Di “opción uno”, “opción dos” o lee una respuesta.</p>
-                                                )}
-                                                <div>
-                                                    {voice.proposal.status === 'matched' && voice.proposal.optionId && (
+                                        {isActiveQuestion && (
+                                            <div className="voice-answer-controls">
+                                                <p className="npc-narration-status" aria-live="polite">
+                                                    {narration.status === 'loading'
+                                                        ? 'Preparando la voz del NPC…'
+                                                        : narration.status === 'playing'
+                                                            ? 'El NPC está leyendo la pregunta y las opciones…'
+                                                            : isListening
+                                                                ? 'Micrófono activo: te estamos escuchando'
+                                                                : voice.status === 'requesting'
+                                                                    ? 'Activando el micrófono…'
+                                                                    : voice.status === 'processing'
+                                                                        ? 'Reconociendo tu respuesta…'
+                                                                        : 'Listo para tu respuesta'}
+                                                </p>
+
+                                                <button
+                                                    type="button"
+                                                    className={`voice-answer-button ${isListening ? 'is-listening' : ''}`}
+                                                    disabled={submitting
+                                                        || isNarrating
+                                                        || voice.capabilities?.transcriptionAvailable === false
+                                                        || voice.status === 'requesting'
+                                                        || voice.status === 'processing'}
+                                                    aria-label={isListening
+                                                        ? `Detener respuesta por voz de la pregunta ${questionIndex + 1}`
+                                                        : `Responder por voz la pregunta ${questionIndex + 1}`}
+                                                    aria-describedby={exampleId}
+                                                    aria-pressed={isListening}
+                                                    onClick={() => {
+                                                        if (isListening) {
+                                                            voice.end();
+                                                            return;
+                                                        }
+                                                        narration.stop();
+                                                        void voice.begin(question, 'automatic');
+                                                    }}
+                                                >
+                                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                        <rect x="9" y="3" width="6" height="11" rx="3" />
+                                                        <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" />
+                                                    </svg>
+                                                </button>
+
+                                                <p id={exampleId} className="voice-answer-example">
+                                                    Responde solo con una letra, por ejemplo: <strong>“A”</strong>
+                                                </p>
+
+                                                {narration.status === 'error' && (
+                                                    <div role="alert" className="voice-answer-feedback is-error">
+                                                        <p>{narration.error}</p>
                                                         <button
                                                             type="button"
-                                                            onClick={() => voice.confirm((questionId, optionId) => {
-                                                                setAnswers((current) => ({ ...current, [questionId]: optionId }));
+                                                            onClick={() => narration.play(question, () => {
+                                                                if (voice.capabilities?.transcriptionAvailable) {
+                                                                    void voice.begin(question, 'automatic');
+                                                                }
                                                             })}
                                                         >
-                                                            Confirmar opción
+                                                            Escuchar pregunta de nuevo
                                                         </button>
-                                                    )}
-                                                    <button type="button" onClick={voice.cancel}>Cancelar o reintentar</button>
-                                                </div>
+                                                    </div>
+                                                )}
+
+                                                {voice.activeQuestionId === question.id && voice.status === 'error' && (
+                                                    <div role="alert" className="voice-answer-feedback is-error">
+                                                        <p>{voice.error}</p>
+                                                        <button type="button" onClick={voice.cancel}>Cerrar</button>
+                                                    </div>
+                                                )}
+
+                                                {voice.activeQuestionId === question.id && voice.proposal && (
+                                                    <div role="status" aria-live="polite" className="voice-answer-feedback">
+                                                        <p><strong>Se entendió:</strong> “{voice.proposal.transcript}”</p>
+                                                        <p>No hubo una coincidencia clara. Responde solamente “A”, “B” o selecciona una opción.</p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                voice.cancel();
+                                                                void voice.begin(question, 'automatic');
+                                                            }}
+                                                        >
+                                                            Intentar de nuevo
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
-                                    </div>
-                                </fieldset>
-                            ))}
+
+                                        {answers[question.id] && (
+                                            <p className="evaluation-answer-confirmation" aria-live="polite">
+                                                Respuesta seleccionada: opción {optionLabel(question.options.findIndex(
+                                                    (option) => option.id === answers[question.id],
+                                                ))}
+                                                {voiceTranscripts[question.id]
+                                                    ? ` · Reconocida de “${voiceTranscripts[question.id]}”`
+                                                    : ''}
+                                            </p>
+                                        )}
+                                    </fieldset>
+                                );
+                            })}
                         </div>
                         <button
+                            ref={submitButtonRef}
                             type="submit"
                             disabled={submitting || answeredCount !== questions.length}
                             style={{ width: '100%', marginTop: '1.25rem', padding: '0.9rem', background: answeredCount === questions.length ? '#2563eb' : '#94a3b8', color: '#fff', border: 0, borderRadius: 8, fontWeight: 800 }}

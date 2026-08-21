@@ -6,10 +6,14 @@ import {
     isCampusZoneUnlocked,
 } from '../../shared/campus';
 import {
+    buildEvaluationNarrationText,
+    EVALUATION_NPC_STATION_ID,
+    getNpcVoiceProfile,
     MAX_RECORDING_SECONDS,
     MAX_TRANSCRIPTION_BYTES,
     resolveNarration,
     SPEECH_LOCALE,
+    type NarrationDescriptor,
 } from '../../shared/speech';
 import { getModuleInteractionObjectIds } from '../../shared/trainingModule';
 import { env } from '../config/env';
@@ -51,6 +55,94 @@ router.get('/capabilities', (_req, res) => {
         maxRecordingSeconds: MAX_RECORDING_SECONDS,
     });
 });
+
+async function hasAssessmentAccess(req: Request, moduleId: string): Promise<boolean> {
+    const interactionObjectIds = getModuleInteractionObjectIds(moduleId);
+    if (!interactionObjectIds || !hasActiveCampusContext(req, 'assessment-room')) return false;
+    const contentIds = await TrainingContent.find({ moduleId, active: true })
+        .where('interactionObjectId').in([...interactionObjectIds])
+        .select('_id')
+        .lean();
+    const progress = await TrainingProgress.findOne(progressIdentityFilter(req.auth!.id, moduleId));
+    const access = getCampusProgressState(
+        progress,
+        contentIds.map((content) => String(content._id)),
+    );
+    return isCampusZoneUnlocked('assessment-room', access);
+}
+
+router.get(
+    '/evaluation-narrations/:moduleId/:questionId',
+    narrationRateLimit,
+    async (req: Request, res: Response): Promise<void> => {
+        try {
+            if (!env.speechEnabled) {
+                res.status(503).json({ error: 'La narración por voz no está configurada.' });
+                return;
+            }
+            const moduleId = typeof req.params.moduleId === 'string' ? req.params.moduleId : '';
+            const questionId = typeof req.params.questionId === 'string' ? req.params.questionId : '';
+            if (!mongoose.isValidObjectId(questionId)) {
+                res.status(400).json({ error: 'questionId no es válido.' });
+                return;
+            }
+            if (!await hasAssessmentAccess(req, moduleId)) {
+                res.status(403).json({ error: 'La evaluación todavía está bloqueada.' });
+                return;
+            }
+            const question = await Question.findOne({ _id: questionId, moduleId, active: true })
+                .select('text options')
+                .lean();
+            if (!question) {
+                res.status(404).json({ error: 'La pregunta no pertenece a la evaluación activa.' });
+                return;
+            }
+            const voice = getNpcVoiceProfile(EVALUATION_NPC_STATION_ID);
+            if (!voice) throw new Error('No existe un perfil de voz para la evaluación.');
+            const descriptor: NarrationDescriptor = {
+                zoneId: 'assessment-room',
+                stationId: EVALUATION_NPC_STATION_ID,
+                bubbleId: questionId,
+                kind: 'explanation',
+                label: 'Pregunta de evaluación',
+                text: buildEvaluationNarrationText(question),
+                voice,
+            };
+            const cacheKey = [
+                CAMPUS_MANIFEST.moduleVersion,
+                CAMPUS_MANIFEST.worldVersion,
+                descriptor.stationId,
+                descriptor.bubbleId,
+                descriptor.voice.voiceName,
+                descriptor.voice.ratePercent,
+                descriptor.voice.pitchPercent,
+                createHash('sha256').update(descriptor.text).digest('base64url'),
+            ].join(':');
+            const etag = `"${createHash('sha256').update(cacheKey).digest('base64url')}"`;
+            if (req.header('if-none-match') === etag) {
+                res.status(304).end();
+                return;
+            }
+            let audio = narrationCache.get(cacheKey);
+            if (!audio) {
+                audio = await synthesizeNarration(descriptor);
+                if (narrationCache.size >= 50) {
+                    const oldest = narrationCache.keys().next().value as string | undefined;
+                    if (oldest) narrationCache.delete(oldest);
+                }
+                narrationCache.set(cacheKey, audio);
+            }
+            res.setHeader('Content-Type', 'audio/mpeg');
+            res.setHeader('Content-Length', audio.length);
+            res.setHeader('Cache-Control', 'private, max-age=86400');
+            res.setHeader('ETag', etag);
+            res.send(audio);
+        } catch (error: unknown) {
+            console.error('Error generando pregunta narrada de evaluación:', error);
+            res.status(502).json({ error: 'No se pudo generar la pregunta narrada. Intente nuevamente.' });
+        }
+    },
+);
 
 router.get(
     '/narrations/:moduleId/:stationId/:bubbleId',
@@ -135,16 +227,7 @@ router.post(
                 res.status(400).json({ error: 'questionId no es válido.' });
                 return;
             }
-            const contentIds = await TrainingContent.find({ moduleId, active: true })
-                .where('interactionObjectId').in([...(getModuleInteractionObjectIds(moduleId) ?? [])])
-                .select('_id')
-                .lean();
-            const progress = await TrainingProgress.findOne(progressIdentityFilter(req.auth!.id, moduleId));
-            const access = getCampusProgressState(
-                progress,
-                contentIds.map((content) => String(content._id)),
-            );
-            if (!isCampusZoneUnlocked('assessment-room', access)) {
+            if (!await hasAssessmentAccess(req, moduleId)) {
                 res.status(403).json({ error: 'La evaluación todavía está bloqueada.' });
                 return;
             }

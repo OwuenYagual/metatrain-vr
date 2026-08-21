@@ -24,6 +24,10 @@ import {
     TRAINING_INTERACTION_OBJECT_IDS,
     TRAINING_STATIONS,
 } from '../../shared/trainingModule';
+import {
+    SIMULATION_STAGE_IDS,
+    type SimulationStageId,
+} from '../../shared/simulation';
 import { authService } from '../auth/authService';
 import { getErrorMessage } from '../api/apiClient';
 import { contentService } from '../content/contentService';
@@ -36,6 +40,8 @@ import {
 import {
     CAMPUS_GUIDE_BUBBLE_ID,
     CAMPUS_GUIDE_DIALOGUE,
+    getSimulationGuideBubbleId,
+    getSimulationGuideStationId,
 } from '../../shared/speech';
 import { getCompletedStationIds } from '../progress/contentProgress';
 import { progressService, type TrainingProgress } from '../progress/progressService';
@@ -48,6 +54,7 @@ import { CampusOverlay } from './CampusOverlay';
 import type { CampusCameraMode } from './CampusPlayer';
 import {
     buildCampusInteractionTargets,
+    getVisibleInteractionTarget,
     getTrainingGuideFocusPosition,
     type CampusInteractionTarget,
 } from './campusTargets';
@@ -55,6 +62,11 @@ import { CampusWorld } from './CampusWorld';
 import { useCampusAudio } from './useCampusAudio';
 import { useCampusKeyboard } from './useCampusKeyboard';
 import { useNpcNarration } from '../speech/useNpcNarration';
+import { useSimulationStore } from '../simulation/useSimulationStore';
+import {
+    SIMULATION_LAB_STAGE_POSITIONS,
+    type SimulationLabSceneState,
+} from './simulationLabScene';
 import './CampusPage.css';
 
 const SimulationPage = lazy(() => import('../simulation/SimulationPage'));
@@ -69,6 +81,17 @@ type CampusProgressRecord = TrainingProgress & {
 type ExperienceKind = 'simulation' | 'evaluation' | 'certificate';
 
 const PORTAL_TRANSITION_COOLDOWN_MS = 750;
+const SIMULATION_STAGE_TARGET_PREFIX = 'simulation-stage-';
+
+function getSimulationStageTargetId(stageId: SimulationStageId): string {
+    return `${SIMULATION_STAGE_TARGET_PREFIX}${stageId}`;
+}
+
+function getSimulationStageId(targetId: string): SimulationStageId | null {
+    if (!targetId.startsWith(SIMULATION_STAGE_TARGET_PREFIX)) return null;
+    const stageId = targetId.slice(SIMULATION_STAGE_TARGET_PREFIX.length);
+    return SIMULATION_STAGE_IDS.find((candidate) => candidate === stageId) ?? null;
+}
 
 function getNavigationSpawnId(state: unknown): string | null {
     if (!state || typeof state !== 'object') return null;
@@ -121,12 +144,16 @@ export default function CampusPage() {
     const setActiveNpcSpeech = useTrainingStore((state) => state.setActiveNpcSpeech);
     const completedContentIds = useTrainingStore((state) => state.completedContentIds);
     const setCompletedContentIds = useTrainingStore((state) => state.setCompletedContentIds);
+    const simulation = useSimulationStore((state) => state.simulation);
+    const currentSimulationStage = useSimulationStore((state) => state.currentStage);
+    const inspectSimulationStage = useSimulationStore((state) => state.inspectStage);
     const [savedProgress, setSavedProgress] = useState<CampusProgressRecord | null>(null);
     const [loading, setLoading] = useState(true);
     const [savingContent, setSavingContent] = useState(false);
     const [error, setError] = useState('');
     const [activeExperience, setActiveExperience] = useState<ExperienceKind | null>(null);
     const [nearbyTarget, setNearbyTarget] = useState<CampusInteractionTarget | null>(null);
+    const nearbyTargetRef = useRef<CampusInteractionTarget | null>(null);
     const [cameraMode, setCameraMode] = useState<CampusCameraMode>('third-person');
     const [quality, setQuality] = useState<'high' | 'adaptive'>('high');
     const [controlsOpen, setControlsOpen] = useState(false);
@@ -138,6 +165,7 @@ export default function CampusPage() {
     const baseDurationRef = useRef(0);
     const portalTransitionLockedUntilRef = useRef(0);
     const cameraModeBeforeTrainingRef = useRef<CampusCameraMode>('third-person');
+    const refreshedSimulationRunRef = useRef<string | null>(null);
 
     const completedStationIds = useMemo(
         () => getCompletedStationIds(contents, completedContentIds),
@@ -168,20 +196,73 @@ export default function CampusPage() {
         ?? (recoveredLocation.zoneId === zoneId ? recoveredLocation.spawnId : undefined);
     const spawn = getCampusSpawn(zoneId, requestedSpawnId ?? undefined);
 
-    const targets = useMemo(() => buildCampusInteractionTargets(
-        zoneId,
+    const simulationActive = activeExperience === 'simulation';
+    const currentSimulationStageProgress = currentSimulationStage
+        ? simulation?.stages.find(({ stageId }) => stageId === currentSimulationStage.id) ?? null
+        : null;
+    const targets = useMemo(() => {
+        const zoneTargets = buildCampusInteractionTargets(
+            zoneId,
+            campusProgress,
+            completedStationIds,
+        );
+        if (zoneId !== 'simulation-lab'
+            || !simulationActive
+            || simulation?.status !== 'in_progress'
+            || !currentSimulationStage) {
+            return zoneTargets;
+        }
+        return [
+            ...zoneTargets,
+            {
+                id: getSimulationStageTargetId(currentSimulationStage.id),
+                label: `Inspeccionar ${currentSimulationStage.evidence.label}`,
+                kind: 'simulation_stage' as const,
+                position: SIMULATION_LAB_STAGE_POSITIONS[currentSimulationStage.id],
+                unlocked: true,
+            },
+        ];
+    }, [
         campusProgress,
         completedStationIds,
-    ), [campusProgress, completedStationIds, zoneId]);
+        currentSimulationStage,
+        simulation?.status,
+        simulationActive,
+        zoneId,
+    ]);
 
-    const objective = useMemo(
-        () => getObjective(zoneId, campusProgress, completedStationIds),
-        [campusProgress, completedStationIds, zoneId],
-    );
+    const simulationSceneState = useMemo<SimulationLabSceneState>(() => ({
+        activeRun: simulation?.status === 'in_progress',
+        currentStageId: simulation?.currentStageId ?? null,
+        stages: simulation?.stages ?? [],
+    }), [simulation]);
+
+    const objective = useMemo(() => {
+        if (zoneId === 'simulation-lab'
+            && simulationActive
+            && currentSimulationStage
+            && currentSimulationStageProgress) {
+            if (currentSimulationStageProgress.status === 'awaiting_inspection') {
+                return `${currentSimulationStage.time}: acércate a ${currentSimulationStage.evidence.label} e inspecciónalo.`;
+            }
+            if (currentSimulationStageProgress.status === 'pending_correction') {
+                return `${currentSimulationStage.time}: realiza una acción correctiva para resolver ${currentSimulationStage.title}.`;
+            }
+            return `${currentSimulationStage.time}: decide cómo actuar en ${currentSimulationStage.title}.`;
+        }
+        return getObjective(zoneId, campusProgress, completedStationIds);
+    }, [
+        campusProgress,
+        completedStationIds,
+        currentSimulationStage,
+        currentSimulationStageProgress,
+        simulationActive,
+        zoneId,
+    ]);
     const activeContentCompleted = activeContent
         ? completedContentIds.includes(activeContent._id)
         : false;
-    const paused = Boolean(activeContent || activeExperience);
+    const paused = Boolean(activeContent || (activeExperience && !simulationActive));
     const conversationFocusTarget = useMemo(
         () => activeContent
             ? getTrainingGuideFocusPosition(activeContent.interactionObjectId) ?? null
@@ -222,6 +303,19 @@ export default function CampusPage() {
         }
         return progress;
     }, [session?.participant.id, setCompletedContentIds]);
+
+    useEffect(() => {
+        if (simulation?.status !== 'completed'
+            || refreshedSimulationRunRef.current === simulation.runId) return;
+        refreshedSimulationRunRef.current = simulation.runId;
+        audio.playEffect('confirm');
+        void refreshProgress().catch((requestError: unknown) => {
+            setError(getErrorMessage(
+                requestError,
+                'La jornada terminó, pero no se pudo actualizar el progreso del campus.',
+            ));
+        });
+    }, [audio, refreshProgress, simulation?.runId, simulation?.status]);
 
     useEffect(() => {
         if (!session?.participant.avatarId || !session.participant.id) {
@@ -317,6 +411,7 @@ export default function CampusPage() {
 
     useEffect(() => {
         const frame = window.requestAnimationFrame(() => {
+            nearbyTargetRef.current = null;
             setNearbyTarget(null);
             setActiveExperience(null);
             setActiveContent(null);
@@ -340,12 +435,20 @@ export default function CampusPage() {
 
     const closePanel = useCallback(() => {
         if (activeContent) restoreTrainingCamera();
+        if (simulationActive) setActiveNpcSpeech(null);
         setActiveContent(null);
         setActiveExperience(null);
         void refreshProgress().catch((requestError: unknown) => {
             setError(getErrorMessage(requestError, 'No se pudo actualizar el progreso.'));
         });
-    }, [activeContent, refreshProgress, restoreTrainingCamera, setActiveContent]);
+    }, [
+        activeContent,
+        refreshProgress,
+        restoreTrainingCamera,
+        setActiveContent,
+        setActiveNpcSpeech,
+        simulationActive,
+    ]);
 
     useEffect(() => {
         if (paused || loading) return undefined;
@@ -366,12 +469,13 @@ export default function CampusPage() {
 
     const interactWithTarget = useCallback((target: CampusInteractionTarget) => {
         if (!targets.some(({ id }) => id === target.id)) {
+            nearbyTargetRef.current = null;
             setNearbyTarget(null);
             setError('');
             return;
         }
 
-        if (nearbyTarget?.id !== target.id) {
+        if (nearbyTargetRef.current?.id !== target.id) {
             audio.playEffect('denied');
             setError('Acércate al objeto antes de interactuar.');
             return;
@@ -387,10 +491,40 @@ export default function CampusPage() {
             if (Date.now() < portalTransitionLockedUntilRef.current) return;
             portalTransitionLockedUntilRef.current = Date.now() + PORTAL_TRANSITION_COOLDOWN_MS;
             audio.playEffect('door');
+            nearbyTargetRef.current = null;
             setNearbyTarget(null);
             navigate(`/campus/${target.portal.targetZoneId}`, {
                 state: { spawnId: target.portal.targetSpawnId },
             });
+            return;
+        }
+
+        if (target.kind === 'simulation_stage') {
+            const stageId = getSimulationStageId(target.id);
+            if (!stageId || currentSimulationStage?.id !== stageId) {
+                audio.playEffect('denied');
+                setError('Esta situación ya no es el objetivo activo de la jornada.');
+                return;
+            }
+            audio.setNarrationEnabled(true);
+            void audio.start();
+            setActiveNpcSpeech({
+                zoneId: 'simulation-lab',
+                stationId: getSimulationGuideStationId(stageId),
+                bubbleId: getSimulationGuideBubbleId(stageId),
+                kind: 'explanation',
+                label: currentSimulationStage.title,
+                visibleText: currentSimulationStage.guide.introduction,
+                fullText: currentSimulationStage.guide.introduction,
+                typing: false,
+            });
+            if (currentSimulationStageProgress?.status !== 'awaiting_inspection') {
+                audio.playEffect('confirm');
+                setError('Ya inspeccionaste esta estación. Elige tu acción en el panel de la jornada.');
+                return;
+            }
+            audio.playEffect('confirm');
+            void inspectSimulationStage(stageId);
             return;
         }
 
@@ -442,29 +576,41 @@ export default function CampusPage() {
             return;
         }
         if (target.kind === 'simulation_terminal') setActiveExperience('simulation');
-        if (target.kind === 'evaluation_terminal') setActiveExperience('evaluation');
+        if (target.kind === 'evaluation_terminal') {
+            audio.setNarrationEnabled(true);
+            void audio.start();
+            setActiveExperience('evaluation');
+        }
         if (target.kind === 'certificate_kiosk') setActiveExperience('certificate');
     }, [
         audio,
         activeNpcSpeech?.stationId,
         cameraMode,
         contents,
+        currentSimulationStage,
+        currentSimulationStageProgress?.status,
         getDurationSeconds,
+        inspectSimulationStage,
         navigate,
-        nearbyTarget,
         setActiveContent,
         setActiveNpcSpeech,
         targets,
         zoneId,
     ]);
 
+    const handleSimulationStageInteract = useCallback((stageId: SimulationStageId) => {
+        const target = targets.find(({ id }) => id === getSimulationStageTargetId(stageId));
+        if (target) interactWithTarget(target);
+    }, [interactWithTarget, targets]);
+
     const handleNearbyTargetChange = useCallback((target: CampusInteractionTarget | null) => {
+        nearbyTargetRef.current = target;
         setNearbyTarget(target);
         if (activeNpcSpeech?.stationId === CAMPUS_GUIDE_OBJECT_ID
             && target?.id !== CAMPUS_GUIDE_OBJECT_ID) {
             setActiveNpcSpeech(null);
         }
-        if (!target?.unlocked || target.kind === 'portal') return;
+        if (!target?.unlocked || target.kind === 'portal' || target.kind === 'simulation_stage') return;
         void interactionSystem.registerInteraction(
             target.id,
             'proximity',
@@ -505,8 +651,9 @@ export default function CampusPage() {
     }, [activeContent, activeExperience, closePanel]);
 
     const handleKeyboardInteract = useCallback(() => {
-        if (nearbyTarget) interactWithTarget(nearbyTarget);
-    }, [interactWithTarget, nearbyTarget]);
+        const target = nearbyTargetRef.current;
+        if (target) interactWithTarget(target);
+    }, [interactWithTarget]);
     const movementRef = useCampusKeyboard({
         paused,
         onInteract: handleKeyboardInteract,
@@ -573,12 +720,8 @@ export default function CampusPage() {
             || (campusZone.id === 'assessment-room' && campusProgress.approved),
     }));
 
-    const experiencePanel = activeExperience === 'simulation'
-        ? <SimulationPage />
-        : <EvaluationPage onMicrophoneActiveChange={audio.setDucked} />;
-
     return (
-        <main className="campus-page">
+        <main className={`campus-page ${simulationActive ? 'is-simulation-active' : ''}`}>
             <div className={`campus-world-shell ${paused ? 'is-paused' : ''}`} aria-hidden={paused}>
                 <SceneErrorBoundary>
                     <CampusWorld
@@ -611,6 +754,9 @@ export default function CampusPage() {
                             }
                         }}
                         onQualityChange={setQuality}
+                        hideSceneLabels={Boolean(activeContent || activeExperience)}
+                        simulationSceneState={simulationSceneState}
+                        onSimulationStageInteract={handleSimulationStageInteract}
                     />
                 </SceneErrorBoundary>
             </div>
@@ -623,7 +769,8 @@ export default function CampusPage() {
                     totalCount={Math.max(TRAINING_STATIONS.length, contents.length)}
                     cameraMode={cameraMode}
                     quality={quality}
-                    nearbyTarget={nearbyTarget}
+                    nearbyTarget={getVisibleInteractionTarget(nearbyTarget, simulationActive)}
+                    hideStatusPanel={simulationActive}
                     zones={hudZones}
                     audio={{
                         started: audio.started,
@@ -658,13 +805,40 @@ export default function CampusPage() {
                 />
             )}
 
-            {activeExperience && (
+            {simulationActive && (
+                <aside className="campus-simulation-panel" aria-label="Jornada del primer día">
+                    <header className="campus-simulation-panel-header campus-simulation-surface">
+                        <div>
+                            <p>Laboratorio de simulación</p>
+                            <h2>{getExperienceTitle('simulation')}</h2>
+                            <p className="campus-simulation-panel-guidance" role="note">
+                                Mantén este panel abierto mientras recorres e interactúas con las demás estaciones.
+                            </p>
+                        </div>
+                        <button type="button" aria-label="Cerrar jornada" onClick={closePanel}>
+                            &times;
+                        </button>
+                    </header>
+                    <div className="campus-simulation-panel-content">
+                        <Suspense fallback={<p className="simulation-panel-loading">Cargando actividad...</p>}>
+                            <SimulationPage />
+                        </Suspense>
+                    </div>
+                </aside>
+            )}
+
+            {activeExperience && !simulationActive && (
                 <CampusOverlay
                     title={getExperienceTitle(activeExperience)}
                     onClose={closePanel}
                 >
                     <Suspense fallback={<p className="campus-loading">Cargando actividad…</p>}>
-                        {experiencePanel}
+                        <EvaluationPage
+                            onMicrophoneActiveChange={audio.setDucked}
+                            audioStarted={audio.started}
+                            narrationMuted={audio.muted}
+                            voiceVolume={audio.voiceVolume}
+                        />
                     </Suspense>
                 </CampusOverlay>
             )}
